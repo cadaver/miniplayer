@@ -2,6 +2,11 @@
 
 9-rasterline player with limited featureset.
 
+- 1 frame of gateoff before new note (does not guarantee proper hard restart)
+- Skips all realtime effects when reading new note data
+- Portamento up/down, toneportamento & vibrato supported of the GT2 effects
+- Pulse and filter tables are based on "destination value compare" instead of being time-based
+
 Converter from GoatTracker 2 format included.
 
 Use at own risk.
