@@ -1,5 +1,5 @@
-// Convertor tool from GoatTracker2 song format to minimal player
-// Cadaver 2/2018
+// Converter tool from GoatTracker2 song format to minimal player
+// Cadaver (loorni@gmail.com) 2/2018
 
 #include <ctype.h>
 #include <stdio.h>

@@ -1,5 +1,5 @@
 ; Minimal feature-limited C64 music player
-; Written by Cadaver 2/2018
+; Written by Cadaver (loorni@gmail.com) 2/2018
 
 TRANS           = $80
 SONGJUMP        = 0
@@ -156,7 +156,7 @@ Play_MasterVol: ora #$0f
 
 Play_ChnExec:   inc chnCounter,x
                 bne Play_NoNewNotes
-Play_NewNotes:  ldy chnSongPos,x                ;Assume sequencer has had time to advance to next pattern
+Play_NewNotes:  ldy chnSongPos,x
                 lda (trackPtrLo),y
                 tay
                 lda pattTblLo-1,y
@@ -175,7 +175,7 @@ Play_NoNewDur:  cmp #WAVEPTR
                 iny
                 lda (pattPtrLo),y
                 sta chnIns,x
-                bmi Play_Rest                   ;Instruments $80-$ff are $00-$7f as legato
+                bmi Play_Rest                   ;Instruments $81-$ff are $01-$7f as legato
 Play_HardRestart:
                 lda #$0f
                 sta $d406,x
@@ -242,9 +242,9 @@ Play_NewNoteInit:
                 sta chnNote,x                   ;Reset newnote-flag
                 ldy chnIns,x
                 bmi Play_LegatoNoteInit
-Play_HRNoteInit:lda insAD-1,y
-                sta $d405,x
-                lda insSR-1,y
+Play_HRNoteInit:lda insAD-1,y                   ;Instruments are 1-indexed just so that the converter can
+                sta $d405,x                     ;differentiate between "no instrument change" and the first
+                lda insSR-1,y                   ;instrument. Strictly speaking they wouldn't need to be
                 sta $d406,x
                 lda #$09                        ;Fixed 1stframe wave
                 sta $d404,x
