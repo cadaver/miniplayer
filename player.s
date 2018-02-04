@@ -132,6 +132,8 @@ Play_WavePtr:   iny
                 jsr Play_SetWavePos
                 beq Play_Rest                   ;Returns with A=0
 
+        ; Playroutine entrypoint. Write subtune number+1 to PlayRoutine+1 to initialize
+
 PlayRoutine:    ldx #$01
                 bne Play_DoInit
 Play_FiltPos:   ldy #$00
