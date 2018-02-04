@@ -101,8 +101,7 @@ Play_DoInit:    dex
 Play_ChnInit:   lda songTbl,y
                 sta chnSongPos,x
                 iny
-                ;lda #$ff
-                lda #$fb
+                lda #$ff
                 sta chnDuration,x
                 lda #$00
                 sta chnCounter,x
