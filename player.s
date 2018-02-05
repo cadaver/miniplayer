@@ -2,13 +2,26 @@
 ; Written by Cadaver (loorni@gmail.com) 2/2018
 
         ; Configuration:
-        ; Need to supply zeropage base address (PLAYER_ZPBASE), 4 consecutive
-        ; locations will be used.
+        ;
+        ; PLAYER_ZPBASE is the zeropage base address. 4 consecutive locations are needed,
+        ; or 5 with sound effect support
+        ;
+        ; PLAYER_SFX is whether to compile in the sound FX player. Three possible values:
+        ;       0 No sound FX support.
+        ;       1 Overrides the music channel on which sounds are played, music can not
+        ;         continue underneath.
+        ;       2 Music is able to continue underneath and resume when the sound stops.
+        ;         This has the effect of requiring extra channel variables and potentially
+        ;         more rastertime.
 
 trackPtrLo      = PLAYER_ZPBASE+0
 trackPtrHi      = PLAYER_ZPBASE+1
 pattPtrLo       = PLAYER_ZPBASE+2
 pattPtrHi       = PLAYER_ZPBASE+3
+
+                if PLAYER_SFX > 0
+sfxTemp         = PLAYER_ZPBASE+4
+                endif
 
         ; Track-data format:
         ; [transpose], pattern, [end]
@@ -130,10 +143,50 @@ REST            = $7f
         ;           $10,$20         lowpass or bandpass (highpass not supported)
         ;           $40,$80,$c0     resonance control
         ;
-        ; Otherwise pulse & filter steps include the cutoff/pulse target in the left column 
-        ; (for pulse, nybbles reversed) and speed (nybble reversed also) in the mid column. 
+        ; Otherwise pulse & filter steps include the cutoff/pulse target in the left column
+        ; (for pulse, nybbles reversed) and speed (nybble reversed also) in the mid column.
         ; Negative pulse speed values must have one subtracted from them, ie. if you have speed 
         ; $40 up, use $bf for down with same speed.
+
+                if PLAYER_SFX > 0
+
+        ; Sound effect playback init
+        ;
+        ; X = channel variable index (0,7,14)
+        ; A = sound data address lowbyte
+        ; Y = sound data address highbyte
+        ; 
+        ; Note: you must devise your own sound effect priority / interruption mechanism.
+        ; Check the channel variable chnSfxPtrHi whether a sound is still playing (nonzero if is)
+        ;
+        ; Sound effect playback does not potentially work right if the call is interrupted by
+        ; the playroutine. Therefore either protect it with sei/cli or call from the same 
+        ; interrupt that calls the playroutine (recommended.)
+        ;
+        ; Sound effect data consists of control bytes followed by data, delays and endmark.
+        ; Each control byte takes 1 frame to execute. The bits are evaluated from LSB first.
+        ;
+        ; $00       Endmark
+        ; $01-$3f   Control byte, bits:
+        ;               $01 Gateoff+HR, also resets internal variables. No other bits will be read.
+        ;               $02 First frame init, followed by AD,SR bytes
+        ;               $04 Set pulse, followed by nybble-reversed pulsewidth
+        ;               $08 Set wave, followed by waveform byte
+        ;               $10 Set frequency, followed by freq highbyte (also set to lowbyte)
+        ;               $20 Set freqmod, followed by 8-bit freqmod speed, which affects only highbyte
+        ; $80-$ff   Delay, is negative similar to wavetable ($ff = one frame)
+
+PlaySfx:        sta chnSfxPtrLo,x
+                tya
+                sta chnSfxPtrHi,x
+                lda #$00
+                sta chnSfxPos,x
+                if PLAYER_SFX = 1               ;Disable the channel for music playback until
+                sta chnSongPos,x                ;new subtune initialized
+                endif
+                rts
+
+                endif
 
 Play_DoInit:    dex
                 txa
@@ -217,9 +270,19 @@ Play_MasterVol: ora #$0f                        ;Can be modified for fadein/out
                 jsr Play_ChnExec
                 ldx #$0e
 
+                if PLAYER_SFX = 0
 Play_ChnExec:   inc chnCounter,x
                 bne Play_NoNewNotes
 Play_NewNotes:  ldy chnSongPos,x
+                endif
+
+                if PLAYER_SFX = 1
+Play_ChnExec:   ldy chnSongPos,x
+                beq Play_JumpToSfx
+                inc chnCounter,x
+                bne Play_NoNewNotes
+                endif
+
                 lda (trackPtrLo),y
                 tay
                 lda pattTblLo-1,y
@@ -256,6 +319,10 @@ Play_Rest:      iny
 Play_PattEnd:   sta chnPattPos,x
                 inc chnSongPos,x
                 rts
+
+                if PLAYER_SFX = 1
+Play_JumpToSfx: jmp Play_SfxExec
+                endif
 
 Play_NoPattEnd: tya
                 sta chnPattPos,x
@@ -392,8 +459,8 @@ Play_Slide:     lda chnFreqLo,x
                 adc noteTbl-1,y
                 sta chnFreqLo,x
                 sta $d400,x
-                lda chnFreqHi,x
-                adc waveNextTbl-1,y
+                lda waveNextTbl-1,y
+Play_SfxFreqMod:adc chnFreqHi,x
                 jmp Play_StoreFreqHi
 
 Play_Vibrato:   lda chnWaveTime,x
@@ -422,6 +489,98 @@ Play_VibDown:   sbc waveNextTbl-1,y
                 sbc #$00
                 jmp Play_StoreFreqHi
 
+                if PLAYER_SFX > 0
+
+        ; Sound effect support code
+
+Play_SfxDelayOngoing:
+                inc chnSfxTime,x
+Play_SfxEffects:lda chnSfxFreqMod,x
+                asl
+                bne Play_SfxFreqMod
+                rts
+Play_SfxEnd:    sta chnSfxPtrHi,x
+Play_SfxDone:   rts
+
+Play_SfxExec:   lda chnSfxPtrHi,x
+                beq Play_SfxDone
+                sta pattPtrHi
+                lda chnSfxPtrLo,x
+                sta pattPtrLo
+                ldy chnSfxPos,x
+                lda (pattPtrLo),y
+                beq Play_SfxEnd
+                bpl Play_NoSfxDelay
+                sec
+                adc chnSfxTime,x
+                bne Play_SfxDelayOngoing
+                sta chnSfxTime,x
+                iny
+                lda (pattPtrLo),y
+
+Play_NoSfxDelay:sta sfxTemp
+Play_NoSfxEnd:  iny
+                lsr sfxTemp
+                bcc Play_NoSfxHR
+                lda #$0f
+                sta $d406,x
+                lda chnWave,x
+                and #$fe
+                sta $d404,x
+                lda #$00
+                sta chnSfxFreqMod,x
+                sta chnSfxTime,x
+                beq Play_NoSfxFreqMod
+
+Play_NoSfxHR:   lsr sfxTemp
+                bcc Play_NoSfxFirstFrame
+                lda (pattPtrLo),y
+                sta $d405,x
+                iny
+                lda (pattPtrLo),y
+                sta $d406,x
+                iny
+                lda #$09
+                sta $d404,x
+
+Play_NoSfxFirstFrame:
+                lsr sfxTemp
+                bcc Play_NoSfxPulse
+                lda (pattPtrLo),y
+                sta chnPulse,x
+                sta $d402,x
+                sta $d403,x
+                iny
+
+Play_NoSfxPulse:
+                lsr sfxTemp
+                bcc Play_NoSfxWave
+                lda (pattPtrLo),y
+                sta chnWave,x
+                sta $d404,x
+                iny
+
+Play_NoSfxWave: lsr sfxTemp
+                bcc Play_NoSfxFreq
+                lda (pattPtrLo),y
+                sta chnFreqHi,x
+                sta $d400,x
+                sta $d401,x
+                iny
+
+Play_NoSfxFreq: lsr sfxTemp
+                bcc Play_NoSfxFreqMod
+                lda (pattPtrLo),y
+                sta chnSfxFreqMod,x
+                iny
+
+Play_NoSfxFreqMod:
+                tya
+                sta chnSfxPos,x
+                jmp Play_SfxEffects
+
+                endif
+
 chnTrans:       dc.b $80
 chnSongPos:     dc.b 0
 chnPattPos:     dc.b 0
@@ -444,6 +603,16 @@ chnFreqHi:      dc.b 0
                 dc.b 0,0,0,0,0,0,0
                 dc.b 0,0,0,0,0,0,0
 
+                if PLAYER_SFX = 1
+chnSfxPos       = chnCounter
+chnSfxPtrLo     = chnNote
+chnSfxPtrHi     = chnIns
+                endif
+                if PLAYER_SFX > 0
+chnSfxTime      = chnWaveTime
+chnSfxFreqMod   = chnWavePos
+chnSfxPulseMod  = chnPulsePos
+                endif
 freqTbl:
                 dc.w $022d,$024e,$0271,$0296,$02be,$02e8,$0314,$0343,$0374,$03a9,$03e1,$041c
                 dc.w $045a,$049c,$04e2,$052d,$057c,$05cf,$0628,$0685,$06e8,$0752,$07c1,$0837

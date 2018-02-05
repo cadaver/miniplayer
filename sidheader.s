@@ -36,6 +36,7 @@ SUBTUNES        = 1
         ; Player configuration
 
 PLAYER_ZPBASE   = $fc
+PLAYER_SFX      = 0
 
         ; Player + musicdata
 

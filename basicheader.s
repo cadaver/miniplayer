@@ -74,15 +74,35 @@ raster:         cld
                 cmp maxraster
                 bcc raster_nonewmax
                 sta maxraster
-raster_nonewmax:jmp $ea31
+raster_nonewmax:lda $dc00
+                and #$10
+                bne raster_nofire
+                ldx #14
+                lda #<soundeffect
+                ldy #>soundeffect
+                jsr PlaySfx
+raster_nofire:  jmp $ea31
 
                 org $1000
 
         ; Player configuration
 
-PLAYER_ZPBASE   = $fc
+PLAYER_ZPBASE   = $fb
+PLAYER_SFX      = 1
 
         ; Player + musicdata
 
                 include player.s
                 include musicdata.s
+
+        ; SFX data
+
+soundeffect:    dc.b $01                        ;Hardrestart
+                dc.b $06,$00,$fa,$08            ;Init+ADSR+pulse
+                dc.b $18,$81,$c0                ;Wave+note
+                dc.b $18,$41,$0c                ;Wave+note
+                dc.b $18,$81,$20                ;Wave+note
+                dc.b $20,$ff                    ;Freqmod
+                dc.b $08,$80                    ;Wave (gate off)
+                dc.b $f0                        ;Delay for 16 frames
+                dc.b $00                        ;End
