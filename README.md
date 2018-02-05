@@ -2,12 +2,20 @@
 
 9-rasterline player with limited featureset.
 
-- 1 frame of gateoff before new note (does not guarantee proper hard restart)
-- Skips all realtime effects when reading new note data
-- Portamento up/down, toneportamento & vibrato supported of the GT2 effects
-- Pulse and filter tables are based on "destination value compare" instead of being time-based
+- Wave / pulse / filtertables with "next column" instead of jumps
+- Delayed step, slide (indefinite) and vibrato commands in wavetable
+- Pulse and filter tables are based on "destination value compare" instead of time counters
+- Normal & legato instruments
+- Keyoff command
+- Change wavetable-pointer command
+- Transpose
 
-Converter from GoatTracker 2 format included. See the player source (player.s) for data format details.
+Disadvantages:
+
+- Only 1 frame of gateoff before new note (does not guarantee proper hard restart)
+- Skips all realtime effects when reading new note data
+
+Converter from GoatTracker 2 format included. See the player source (player.s) for data format details. Supported effects are 1,2,3,4 and F (no funktempo). Effect 3 (toneportamento) support is based on calculating the required slide duration, and may not work exactly in case of transposed patterns.
 
 Use at own risk.
 
