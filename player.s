@@ -11,11 +11,12 @@ pattPtrLo       = PLAYER_ZPBASE+2
 pattPtrHi       = PLAYER_ZPBASE+3
 
         ; Track-data format:
-        ; [transpose], pattern, [jump]
+        ; [transpose], pattern, [end]
         ;
+        ; $00       Song end, followed by loop position
         ; $01-$7f   Patterns
         ; $80-$ff   Signed transpose, $80 being neutral
-        ; $00       Song end, followed by loop position
+
         ;
         ; All tracks of subtune must fit into 255 bytes. Start indices into trackdata are 1-based.
         ; Index 0 may be used for sound effect support purposes and is unavailable.
@@ -28,14 +29,11 @@ SONGJUMP        = 0
         ;
         ; Note values:
         ; $00       Pattern end
-        ; $02-$7a   Notes with instrument change
-        ; $01-$7b   Notes without instrument change
-        ; $7c       Waveptr change command, new position byte follows
+        ; $02-$7a   Notes with instrument byte following
+        ; $03-$7b   Notes without instrument change
+        ; $7c       Waveptr change command, followed by new wave pointer
         ; $7e       Gate off
         ; $7f       Rest
-        ;
-        ; Instruments $01-$7f use gateoff and full ADSR init.
-        ; Instruments $81-$ff are the same instruments in legato mode: no gateoff, no ADSR change
         ;
         ; Duration values are negative from $80-$ff, with $fe representing the shortest legal
         ; duration (3)
@@ -109,8 +107,10 @@ REST            = $7f
 
         ; Instruments are roughly as in NinjaTracker 2, having ADSR and wave/pulse/filterpointers
         ;
-        ; Use 0 in pulse & filterpointer to skip initialization.
-        ; When instrument is used in legato mode (instrument number $80+) ADSR init will be skipped.
+        ; Instruments $01-$7f use gateoff before note and ADSR init.
+        ; Instruments $81-$ff are the same instruments in legato mode: no gateoff, no ADSR change
+        ;
+        ; Use 0 in pulse & filterpointers to skip initialization.
 
         ; Tables are based on having 3 colums, like NinjaTracker 1.
         ; The right side column is the "next" position, 0 to stop wave/pulse/filter
@@ -119,21 +119,21 @@ REST            = $7f
         ; $00       Vibrato, mid column is negative width, and right column speed
         ; $01-$8f   Waveform values, mid column is note ($00-$7f relative, $80-$ff absolute)
         ; $90       Slide, mid+right columns are 16bit speed
-        ; $91       Delayed wavetable step without wavechange, delay is negative ($ff = one frame)
+        ; $91-$ff   Delayed wavetable step without wavechange, delay is negative ($ff = one frame)
         ;
         ; If pulse or filterpointer has the high bit ($80) set, the next step will be interpreted
         ; as an init-step:
         ;
         ; For pulse: nybble-reversed initial pulse value in left (limit) column
         ; For filter: initial cutoff value in left column, mid column contains control bits:
-        ;           $10,$20         lowpass or bandpass (highpass not supported)
         ;           $01,$02,$04     channels to filter
-        ;           $40,$80,$c0    resonance control
+        ;           $10,$20         lowpass or bandpass (highpass not supported)
+        ;           $40,$80,$c0     resonance control
         ;
-        ; Otherwise pulse & filter steps include the cutoff/pulse target in the left column (for 
-        ; pulse, nybbles reversed) and speed (nybble reversed also) in the mid column. Negative pulse
-        ; speed values must have one subtracted from them, ie. if you have speed $40 up, use speed $bf
-        ; for down with same speed.
+        ; Otherwise pulse & filter steps include the cutoff/pulse target in the left column 
+        ; (for pulse, nybbles reversed) and speed (nybble reversed also) in the mid column. 
+        ; Negative pulse speed values must have one subtracted from them, ie. if you have speed 
+        ; $40 up, use $bf for down with same speed.
 
 Play_DoInit:    dex
                 txa
