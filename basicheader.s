@@ -78,5 +78,11 @@ raster_nonewmax:jmp $ea31
 
                 org $1000
 
+        ; Player configuration
+
+PLAYER_ZPBASE   = $fc
+
+        ; Player + musicdata
+
                 include player.s
                 include musicdata.s

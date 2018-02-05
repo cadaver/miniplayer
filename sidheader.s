@@ -33,6 +33,12 @@ SUBTUNES        = 1
                 jmp Init
                 jmp PlayRoutine
 
+        ; Player configuration
+
+PLAYER_ZPBASE   = $fc
+
+        ; Player + musicdata
+
                 include player.s
 
 Init:           clc

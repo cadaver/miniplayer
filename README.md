@@ -7,7 +7,7 @@
 - Portamento up/down, toneportamento & vibrato supported of the GT2 effects
 - Pulse and filter tables are based on "destination value compare" instead of being time-based
 
-Converter from GoatTracker 2 format included.
+Converter from GoatTracker 2 format included. See the player source (player.s) for data format details.
 
 Use at own risk.
 

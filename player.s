@@ -1,8 +1,44 @@
 ; Minimal feature-limited C64 music player
 ; Written by Cadaver (loorni@gmail.com) 2/2018
 
+        ; Configuration:
+        ; Need to supply zeropage base address (PLAYER_ZPBASE), 4 consecutive
+        ; locations will be used.
+
+trackPtrLo      = PLAYER_ZPBASE+0
+trackPtrHi      = PLAYER_ZPBASE+1
+pattPtrLo       = PLAYER_ZPBASE+2
+pattPtrHi       = PLAYER_ZPBASE+3
+
+        ; Track-data format:
+        ; [transpose], pattern, [jump]
+        ;
+        ; $01-$7f   Patterns
+        ; $80-$ff   Signed transpose, $80 being neutral
+        ; $00       Song end, followed by loop position
+        ;
+        ; All tracks of subtune must fit into 255 bytes. Start indices into trackdata are 1-based.
+        ; Index 0 may be used for sound effect support purposes and is unavailable.
+
 TRANS           = $80
 SONGJUMP        = 0
+
+        ; Pattern-data format:
+        ; note, [instrument], [duration], [end]
+        ;
+        ; Note values:
+        ; $00       Pattern end
+        ; $02-$7a   Notes with instrument change
+        ; $01-$7b   Notes without instrument change
+        ; $7c       Waveptr change command, new position byte follows
+        ; $7e       Gate off
+        ; $7f       Rest
+        ;
+        ; Instruments $01-$7f use gateoff and full ADSR init.
+        ; Instruments $81-$ff are the same instruments in legato mode: no gateoff, no ADSR change
+        ;
+        ; Duration values are negative from $80-$ff, with $fe representing the shortest legal
+        ; duration (3)
 
 ENDPATT         = 0
 INS             = -1
@@ -71,10 +107,33 @@ WAVEPTR         = $7c
 KEYOFF          = $7e
 REST            = $7f
 
-trackPtrLo      = $fc
-trackPtrHi      = $fd
-pattPtrLo       = $fe
-pattPtrHi       = $ff
+        ; Instruments are roughly as in NinjaTracker 2, having ADSR and wave/pulse/filterpointers
+        ;
+        ; Use 0 in pulse & filterpointer to skip initialization.
+        ; When instrument is used in legato mode (instrument number $80+) ADSR init will be skipped.
+
+        ; Tables are based on having 3 colums, like NinjaTracker 1.
+        ; The right side column is the "next" position, 0 to stop wave/pulse/filter
+        ;
+        ; Wavetable left column values:
+        ; $00       Vibrato, mid column is negative width, and right column speed
+        ; $01-$8f   Waveform values, mid column is note ($00-$7f relative, $80-$ff absolute)
+        ; $90       Slide, mid+right columns are 16bit speed
+        ; $91       Delayed wavetable step without wavechange, delay is negative ($ff = one frame)
+        ;
+        ; If pulse or filterpointer has the high bit ($80) set, the next step will be interpreted
+        ; as an init-step:
+        ;
+        ; For pulse: nybble-reversed initial pulse value in left (limit) column
+        ; For filter: initial cutoff value in left column, mid column contains control bits:
+        ;           $10,$20         lowpass or bandpass (highpass not supported)
+        ;           $01,$02,$04     channels to filter
+        ;           $40,$80,$c0    resonance control
+        ;
+        ; Otherwise pulse & filter steps include the cutoff/pulse target in the left column (for 
+        ; pulse, nybbles reversed) and speed (nybble reversed also) in the mid column. Negative pulse
+        ; speed values must have one subtracted from them, ie. if you have speed $40 up, use speed $bf
+        ; for down with same speed.
 
 Play_DoInit:    dex
                 txa
@@ -114,8 +173,8 @@ Play_ChnInit:   lda songTbl,y
 
 Play_FiltInit:  lda filtSpdTbl-$81,y
                 sta $d417
-                and #$30
-                sta Play_FiltType+1
+                and #$30                        ;Lowpass or bandpass allowed, rest of bits used for
+                sta Play_FiltType+1             ;resonance control
                 lda filtNextTbl-$81,y
                 sta Play_FiltPos+1
                 lda filtLimitTbl-$81,y
@@ -132,7 +191,9 @@ Play_WavePtr:   iny
                 jsr Play_SetWavePos
                 beq Play_Rest                   ;Returns with A=0
 
-        ; Playroutine entrypoint. Write subtune number+1 to PlayRoutine+1 to initialize
+        ; Playroutine entrypoint. 
+        ;
+        ; Write subtune number+1 to PlayRoutine+1 to initialize
 
 PlayRoutine:    ldx #$01
                 bne Play_DoInit
@@ -149,7 +210,7 @@ Play_StoreCutoff:
                 sta $d416
 Play_FiltDone:
 Play_FiltType:  lda #$00
-Play_MasterVol: ora #$0f
+Play_MasterVol: ora #$0f                        ;Can be modified for fadein/out
                 sta $d418
                 jsr Play_ChnExec
                 ldx #$07
@@ -167,7 +228,7 @@ Play_NewNotes:  ldy chnSongPos,x
                 sta pattPtrHi
                 ldy chnPattPos,x
                 lda (pattPtrLo),y
-Play_NoNewDur:  cmp #WAVEPTR
+                cmp #WAVEPTR
                 bcs Play_Commands
                 lsr
                 bcs Play_NoNewIns
