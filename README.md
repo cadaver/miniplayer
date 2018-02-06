@@ -9,11 +9,13 @@
 - Keyoff command
 - Change wavetable-pointer command
 - Transpose
+- Sound FX support, either overrides the channel completely (faster) or allows music to continue underneath
 
 Disadvantages:
 
 - Only 1 frame of gateoff before new note (does not guarantee proper hard restart)
 - Skips all realtime effects when reading new note data
+- Pulse & filter tables can be only 127 steps, due to high bit of position indicating "init" step
 
 Converter from GoatTracker 2 format included. See the player source (player.s) for data format details. Supported effects are 1,2,3,4 and F (no funktempo). Effect 3 (toneportamento) support is based on calculating the required slide duration, and may not work exactly in case of transposed patterns.
 

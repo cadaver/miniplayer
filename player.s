@@ -334,9 +334,8 @@ Play_NoNewNotes:bmi Play_PulseExec
 
 Play_Sequencer: ldy chnSongPos,x
                 lda (trackPtrLo),y
-                beq Play_SongJump
                 bmi Play_SongTrans
-                bpl Play_SequencerDone
+                bne Play_SequencerDone
 Play_SongJump:  iny
                 lda (trackPtrLo),y
                 tay
