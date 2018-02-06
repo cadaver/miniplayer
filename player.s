@@ -188,41 +188,13 @@ PlaySfx:        sta chnSfxPtrLo,x
 
                 endif
 
-Play_DoInit:    dex
-                txa
-                sta pattPtrLo
-                asl
-                asl
-                adc pattPtrLo
-                tay
-                lda songTbl,y
-                sta trackPtrLo
-                iny
-                lda songTbl,y
-                sta trackPtrHi
-                iny
-                ldx #$00
-                stx Play_FiltPos+1
-                stx Play_FiltType+1
-                stx $d417
-                stx PlayRoutine+1
-                jsr Play_ChnInit
-                ldx #$07
-                jsr Play_ChnInit
-                ldx #$0e
-Play_ChnInit:   lda songTbl,y
-                sta chnSongPos,x
-                iny
-                lda #$ff
-                sta chnDuration,x
-                lda #$00
-                sta chnCounter,x
-                sta chnNote,x
-                sta chnPattPos,x
-                sta chnWavePos,x
-                sta chnPulsePos,x
-                sta $d404,x
-                rts
+        ; Playroutine entrypoint.
+        ;
+        ; Write subtune number+1 to PlayRoutine+1 to initialize
+
+PlayRoutine:    ldx #$01
+                beq Play_FiltPos
+                jmp Play_DoInit
 
 Play_FiltInit:  lda filtSpdTbl-$81,y
                 sta $d417
@@ -237,19 +209,24 @@ Play_FiltNext:  lda filtNextTbl-1,y
                 jmp Play_FiltDone
 
 Play_Commands:  cmp #KEYOFF
+                if PLAYER_SFX = 2
+                beq Play_KeyoffSfxCheck
+                else
+                beq Play_Keyoff
+                endif
                 beq Play_Keyoff
                 bcs Play_Rest
 Play_WavePtr:   iny
                 lda (pattPtrLo),y
                 jsr Play_SetWavePos
                 beq Play_Rest                   ;Returns with A=0
+                if PLAYER_SFX = 2
+Play_KeyoffSfxCheck:
+                lda chnSfxPtrHi,x
+                bne Play_Rest
+                beq Play_Keyoff
+                endif
 
-        ; Playroutine entrypoint. 
-        ;
-        ; Write subtune number+1 to PlayRoutine+1 to initialize
-
-PlayRoutine:    ldx #$01
-                bne Play_DoInit
 Play_FiltPos:   ldy #$00
                 beq Play_FiltDone
                 bmi Play_FiltInit
@@ -270,13 +247,11 @@ Play_MasterVol: ora #$0f                        ;Can be modified for fadein/out
                 jsr Play_ChnExec
                 ldx #$0e
 
-                if PLAYER_SFX = 0
+                if PLAYER_SFX != 1
 Play_ChnExec:   inc chnCounter,x
                 bne Play_NoNewNotes
 Play_NewNotes:  ldy chnSongPos,x
-                endif
-
-                if PLAYER_SFX = 1
+                else
 Play_ChnExec:   ldy chnSongPos,x
                 beq Play_JumpToSfx
                 inc chnCounter,x
@@ -303,6 +278,10 @@ Play_ChnExec:   ldy chnSongPos,x
                 sta chnIns,x
                 bmi Play_Rest                   ;Instruments $81-$ff are $01-$7f as legato
 Play_HardRestart:
+                if PLAYER_SFX = 2
+                lda chnSfxPtrHi,x
+                bne Play_Rest
+                endif
                 lda #$0f
                 sta $d406,x
 Play_Keyoff:    lda chnWave,x
@@ -316,17 +295,19 @@ Play_Rest:      iny
                 iny
                 lda (pattPtrLo),y
                 bne Play_NoPattEnd
-Play_PattEnd:   sta chnPattPos,x
-                inc chnSongPos,x
+Play_PattEnd:   inc chnSongPos,x
+                dc.b $24                        ;Skip next instruction
+Play_NoPattEnd: tya
+                sta chnPattPos,x
+                if PLAYER_SFX = 2
+                lda chnSfxPtrHi,x
+                bne Play_JumpToSfx
+                endif
                 rts
 
                 if PLAYER_SFX = 1
 Play_JumpToSfx: jmp Play_SfxExec
                 endif
-
-Play_NoPattEnd: tya
-                sta chnPattPos,x
-                rts
 
 Play_NoNewIns:  clc
                 adc chnTrans,x
@@ -341,6 +322,10 @@ Play_LegatoNoteInit:
                 and #$7f
                 tay
                 bpl Play_FinishLegatoInit
+
+                if PLAYER_SFX = 2
+Play_JumpToSfx: jmp Play_SfxExec
+                endif
 
 Play_NoNewNotes:bmi Play_PulseExec
                 lda chnDuration,x
@@ -364,6 +349,10 @@ Play_NoSongJumpTrans:
                 tya
                 sta chnSongPos,x
 Play_SequencerDone:
+                if PLAYER_SFX = 2
+                lda chnSfxPtrHi,x
+                bne Play_JumpToSfx
+                endif
                 lda chnNote,x
                 bpl Play_WaveExec
 
@@ -397,7 +386,11 @@ Play_NoSequencer:
                 lda chnNote,x
                 bmi Play_NewNoteInit
 
-Play_PulseExec: ldy chnPulsePos,x
+Play_PulseExec: if PLAYER_SFX = 2
+                lda chnSfxPtrHi,x
+                bne Play_JumpToSfx
+                endif
+                ldy chnPulsePos,x
                 beq Play_WaveExec
                 bmi Play_PulseInit
                 lda chnPulse,x
@@ -500,11 +493,23 @@ Play_SfxEffects:lda chnSfxFreqMod,x
                 bne Play_SfxFreqMod
                 rts
 Play_SfxEnd:    sta chnSfxPtrHi,x
+                if PLAYER_SFX = 2
+                sta chnWavePos,x                ;Also reset wavepos when returning from sound FX to music
+                endif
 Play_SfxDone:   rts
 
-Play_SfxExec:   lda chnSfxPtrHi,x
+Play_SfxExec:   if PLAYER_SFX = 1
+                lda chnSfxPtrHi,x
                 beq Play_SfxDone
+                endif
                 sta pattPtrHi
+                if PLAYER_SFX = 2
+                lda chnNote,x                   ;Prevent newnoteinit triggering during sound FX
+                bpl Play_SfxNoNewNote
+                and #$7f
+                sta chnNote,x
+Play_SfxNoNewNote:
+                endif
                 lda chnSfxPtrLo,x
                 sta pattPtrLo
                 ldy chnSfxPos,x
@@ -547,7 +552,6 @@ Play_NoSfxFirstFrame:
                 lsr sfxTemp
                 bcc Play_NoSfxPulse
                 lda (pattPtrLo),y
-                sta chnPulse,x
                 sta $d402,x
                 sta $d403,x
                 iny
@@ -581,6 +585,42 @@ Play_NoSfxFreqMod:
 
                 endif
 
+Play_DoInit:    dex
+                txa
+                sta pattPtrLo
+                asl
+                asl
+                adc pattPtrLo
+                tay
+                lda songTbl,y
+                sta trackPtrLo
+                iny
+                lda songTbl,y
+                sta trackPtrHi
+                iny
+                ldx #$00
+                stx Play_FiltPos+1
+                stx Play_FiltType+1
+                stx $d417
+                stx PlayRoutine+1
+                jsr Play_ChnInit
+                ldx #$07
+                jsr Play_ChnInit
+                ldx #$0e
+Play_ChnInit:   lda songTbl,y
+                sta chnSongPos,x
+                iny
+                lda #$ff
+                sta chnDuration,x
+                lda #$00
+                sta chnCounter,x
+                sta chnNote,x
+                sta chnPattPos,x
+                sta chnWavePos,x
+                sta chnPulsePos,x
+                sta $d404,x
+                rts
+
 chnTrans:       dc.b $80
 chnSongPos:     dc.b 0
 chnPattPos:     dc.b 0
@@ -602,16 +642,29 @@ chnFreqHi:      dc.b 0
 
                 dc.b 0,0,0,0,0,0,0
                 dc.b 0,0,0,0,0,0,0
+                
+                if PLAYER_SFX = 2
+chnSfxPos:      dc.b 0
+chnSfxPtrLo:    dc.b 0
+chnSfxPtrHi:    dc.b 0
+                dc.b 0
+                dc.b 0
+                dc.b 0
+                dc.b 0
+
+                dc.b 0,0,0,0,0,0,0
+                dc.b 0,0,0
+                endif
 
                 if PLAYER_SFX = 1
 chnSfxPos       = chnCounter
 chnSfxPtrLo     = chnNote
 chnSfxPtrHi     = chnIns
                 endif
+
                 if PLAYER_SFX > 0
 chnSfxTime      = chnWaveTime
 chnSfxFreqMod   = chnWavePos
-chnSfxPulseMod  = chnPulsePos
                 endif
 freqTbl:
                 dc.w $022d,$024e,$0271,$0296,$02be,$02e8,$0314,$0343,$0374,$03a9,$03e1,$041c

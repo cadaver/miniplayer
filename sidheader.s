@@ -31,7 +31,6 @@ SUBTUNES        = 1
                 rorg $1000
 
                 jmp Init
-                jmp PlayRoutine
 
         ; Player configuration
 
@@ -48,4 +47,3 @@ Init:           clc
                 rts
 
                 include musicdata.s
-                

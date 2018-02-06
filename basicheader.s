@@ -88,7 +88,7 @@ raster_nofire:  jmp $ea31
         ; Player configuration
 
 PLAYER_ZPBASE   = $fb
-PLAYER_SFX      = 1
+PLAYER_SFX      = 2
 
         ; Player + musicdata
 
