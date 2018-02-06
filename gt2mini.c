@@ -804,6 +804,8 @@ void convertsong(void)
                         ntpulselimittbl[ntpulsesize] = (time & 0xf) | (spd & 0xf0);
                         ntpulsespdtbl[ntpulsesize] = 0;
                         ntpulsenexttbl[ntpulsesize] = ntpulsesize+1+1;
+                        if (ntpulsesize > 1 && ntpulsenexttbl[ntpulsesize-1] == ntpulsesize+1)
+                            ntpulsenexttbl[ntpulsesize-1] |= 0x80;
                         pulsevalue = ((time & 0xf) << 8) | spd;
                     }
                     else
@@ -861,6 +863,8 @@ void convertsong(void)
                         ntfiltnexttbl[ntfiltsize] = ntfiltsize+1+1;
                         if (ltable[FTBL][sp] != 0)
                             printf("Warning: filter init-step not followed by set cutoff-step\n");
+                        if (ntfiltsize > 1 && ntfiltnexttbl[ntfiltsize-1] == ntfiltsize+1)
+                            ntfiltnexttbl[ntfiltsize-1] |= 0x80;
                         ++ntfiltsize;
                     }
                     else if (time == 0 && ntfiltsize > 0)
@@ -1250,14 +1254,6 @@ void convertsong(void)
             }
         }
         
-
-        printf("Pattern %d after operations:\n", e);
-        for (c = 0; c < MAX_PATTROWS; c++)
-        {
-            if (notecolumn[c] == NT_ENDPATT)
-                break;
-            printf("%02x %02x %02x\n", notecolumn[c], cmdcolumn[c], durcolumn[c]);
-        }
         // Clear unneeded durations
         for (c = 0; c < MAX_PATTROWS+1; c++)
         {

@@ -6,7 +6,7 @@ clean:
 gt2mini.exe: gt2mini.c fileio.c
 	gcc gt2mini.c fileio.c -ogt2mini.exe
 
-musicdata.s: mw4title.sng
+musicdata.s: gt2mini.exe mw4title.sng
 	gt2mini mw4title.sng musicdata.s
 
 example.prg: prgexample.s player.s musicdata.s
