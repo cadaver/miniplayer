@@ -1,4 +1,4 @@
-all: gt2mini.exe player.prg player.sid
+all: gt2mini.exe example.prg example.sid
 
 clean:
 	del *.exe
@@ -9,8 +9,8 @@ gt2mini.exe: gt2mini.c fileio.c
 musicdata.s: mw4title.sng
 	gt2mini mw4title.sng musicdata.s
 
-player.prg: basicheader.s player.s musicdata.s
-	dasm basicheader.s -oplayer.prg -p3
+example.prg: prgexample.s player.s musicdata.s
+	dasm prgexample.s -oexample.prg -p3
 
-player.sid: sidheader.s player.s musicdata.s
-	dasm sidheader.s -oplayer.sid -p3 -f3
+example.sid: sidexample.s player.s musicdata.s
+	dasm sidexample.s -oexample.sid -p3 -f3

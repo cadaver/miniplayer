@@ -1,3 +1,5 @@
+; .prg example of using the playroutine. Press fire to trigger a sound effect.
+
                 processor 6502
                 org $0801
 
