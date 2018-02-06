@@ -75,13 +75,21 @@ raster:         cld
                 bcc raster_nonewmax
                 sta maxraster
 raster_nonewmax:lda $dc00
+                pha
                 and #$10
                 bne raster_nofire
+                lda prevjoy
+                and #$10
+                beq raster_nofire
                 ldx #14
                 lda #<soundeffect
                 ldy #>soundeffect
                 jsr PlaySfx
-raster_nofire:  jmp $ea31
+raster_nofire:  pla
+                sta prevjoy
+                jmp $ea31
+
+prevjoy:        dc.b 0
 
                 org $1000
 

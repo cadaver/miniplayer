@@ -29,10 +29,9 @@ sfxTemp         = PLAYER_ZPBASE+4
         ; $00       Song end, followed by loop position
         ; $01-$7f   Patterns
         ; $80-$ff   Signed transpose, $80 being neutral
-
         ;
-        ; All tracks of subtune must fit into 255 bytes. Start indices into trackdata are 1-based.
-        ; Index 0 may be used for sound effect support purposes and is unavailable.
+        ; All tracks of subtune must fit into 255 bytes. Start indices into trackdata are 1-based,
+        ; as index 0 is used for PLAYER_SFX mode 1.
 
 TRANS           = $80
 SONGJUMP        = 0
@@ -519,10 +518,9 @@ Play_SfxNoNewNote:
                 sec
                 adc chnSfxTime,x
                 bne Play_SfxDelayOngoing
-                sta chnSfxTime,x
-                iny
-                lda (pattPtrLo),y
-
+Play_SfxDelayDone:
+                inc chnSfxPos,x                 ;Delay ended, run still effects only this frame
+                bne Play_SfxEffects
 Play_NoSfxDelay:sta sfxTemp
 Play_NoSfxEnd:  iny
                 lsr sfxTemp
