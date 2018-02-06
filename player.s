@@ -518,6 +518,7 @@ Play_SfxNoNewNote:
                 adc chnSfxTime,x
                 bne Play_SfxDelayOngoing
 Play_SfxDelayDone:
+                sta chnSfxTime,x
                 inc chnSfxPos,x                 ;Delay ended, run still effects only this frame
                 bne Play_SfxEffects
 Play_NoSfxDelay:sta sfxTemp
