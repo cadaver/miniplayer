@@ -394,7 +394,7 @@ Play_SequencerDone:
                 endif
                 lda chnNote,x
                 bpl Play_WaveExec
-                jmp Play_NewNoteInit
+                bmi Play_NewNoteInit
 
 Play_PulseInit: lda pulseNextTbl-$81,y
                 sta chnPulsePos,x
