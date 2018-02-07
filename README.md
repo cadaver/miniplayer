@@ -10,6 +10,7 @@
 - Change wavetable-pointer command
 - Transpose
 - Sound FX support, either overrides the channel completely (faster) or allows music to continue underneath
+- Support for several music modules with the same player code, similar to NinjaTracker gamemusic mode.
 
 Disadvantages:
 
