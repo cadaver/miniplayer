@@ -130,7 +130,8 @@ REST            = $7f
         ; Wavetable left column values:
         ; $00       Vibrato, mid column is negative width, and right column speed
         ; $01-$8f   Waveform values, mid column is note ($00-$7f relative, $80-$ff absolute)
-        ; $90       Slide, mid+right columns are 16bit speed
+        ; $90       Slide, mid+right columns are 16bit speed-1, optimization due to carry being set
+        ;           in slide routine
         ; $91-$ff   Delayed wavetable step without wavechange, delay is negative ($ff = one frame)
         ;
         ; If pulse or filterpointer has the high bit ($80) set, the next step will be interpreted
@@ -407,22 +408,7 @@ Play_WaveExec:  ldy chnWavePos,x
                 lda waveTbl-1,y
                 beq Play_Vibrato
                 cmp #$90
-                bcc Play_SetWave
-                beq Play_Slide
-Play_WaveDelay: adc chnWaveTime,x
-                bne Play_WaveDelayNotOver
-                clc
-                sta chnWaveTime,x
-                bcc Play_NoWaveChange
-
-Play_PulseInit: lda pulseNextTbl-$81,y
-                sta chnPulsePos,x
-                lda pulseLimitTbl-$81,y
-                jmp Play_StorePulse
-Play_PulseNext: lda pulseNextTbl-1,y
-                sta chnPulsePos,x
-                jmp Play_WaveExec
-
+                bcs Play_SlideOrDelay
 Play_SetWave:   sta chnWave,x
                 sta $d404,x
 Play_NoWaveChange:
@@ -445,14 +431,21 @@ Play_WaveDelayNotOver:
                 inc chnWaveTime,x
                 rts
 
-Play_Slide:     lda chnFreqLo,x
+Play_PulseInit: lda pulseNextTbl-$81,y
+                sta chnPulsePos,x
+                lda pulseLimitTbl-$81,y
+                jmp Play_StorePulse
+Play_PulseNext: lda pulseNextTbl-1,y
+                sta chnPulsePos,x
+                jmp Play_WaveExec
+
+Play_SlideOrDelay:
+                beq Play_Slide
+Play_WaveDelay: adc chnWaveTime,x
+                bne Play_WaveDelayNotOver
                 clc
-                adc noteTbl-1,y
-                sta chnFreqLo,x
-                sta $d400,x
-                lda waveNextTbl-1,y
-Play_SfxFreqMod:adc chnFreqHi,x
-                jmp Play_StoreFreqHi
+                sta chnWaveTime,x
+                bcc Play_NoWaveChange
 
 Play_Vibrato:   lda chnWaveTime,x
                 bpl Play_VibNoDir
@@ -478,6 +471,14 @@ Play_VibDown:   sbc waveNextTbl-1,y
                 bcs Play_WaveDone
                 lda chnFreqHi,x
                 sbc #$00
+                jmp Play_StoreFreqHi
+
+Play_Slide:     lda chnFreqLo,x
+                adc noteTbl-1,y                 ;Note: speed must be stored as speed-1 due to C=1 here
+                sta chnFreqLo,x
+                sta $d400,x
+                lda waveNextTbl-1,y
+Play_SfxFreqMod:adc chnFreqHi,x
                 jmp Play_StoreFreqHi
 
                 if PLAYER_SFX > 0

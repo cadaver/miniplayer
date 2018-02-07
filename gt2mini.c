@@ -982,8 +982,8 @@ void convertsong(void)
                             if (gtcmddata != 0 && slidemap[gtcmddata] == 0 && ntwavesize < 256)
                             {
                                 ntwavetbl[ntwavesize] = 0x90;
-                                ntnexttbl[ntwavesize] = speed >> 8;
-                                ntnotetbl[ntwavesize] = speed & 0xff;
+                                ntnexttbl[ntwavesize] = (speed-1) >> 8;
+                                ntnotetbl[ntwavesize] = (speed-1) & 0xff;
                                 slidemap[gtcmddata] = ntwavesize+1;
                                 ntwavesize++;
                             }
@@ -995,8 +995,8 @@ void convertsong(void)
                             if (gtcmddata != 0 && slidemap[gtcmddata+0x100] == 0 && ntwavesize < 256)
                             {
                                 ntwavetbl[ntwavesize] = 0x90;
-                                ntnexttbl[ntwavesize] = speed >> 8;
-                                ntnotetbl[ntwavesize] = speed & 0xff;
+                                ntnexttbl[ntwavesize] = (speed-1) >> 8;
+                                ntnotetbl[ntwavesize] = (speed-1) & 0xff;
                                 slidemap[gtcmddata+0x100] = ntwavesize+1;
                                 ntwavesize++;
                            }
@@ -1016,8 +1016,8 @@ void convertsong(void)
                     if (gtcmddata != 0 && slidemap[gtcmddata] == 0 && ntwavesize < 256)
                     {
                         ntwavetbl[ntwavesize] = 0x90;
-                        ntnexttbl[ntwavesize] = speed >> 8;
-                        ntnotetbl[ntwavesize] = speed & 0xff;
+                        ntnexttbl[ntwavesize] = (speed-1) >> 8;
+                        ntnotetbl[ntwavesize] = (speed-1) & 0xff;
                         slidemap[gtcmddata] = ntwavesize+1;
                         ntwavesize++;
                     }
@@ -1033,8 +1033,8 @@ void convertsong(void)
                     if (gtcmddata != 0 && slidemap[gtcmddata+0x100] == 0 && ntwavesize < 256)
                     {
                         ntwavetbl[ntwavesize] = 0x90;
-                        ntnexttbl[ntwavesize] = speed >> 8;
-                        ntnotetbl[ntwavesize] = speed & 0xff;
+                        ntnexttbl[ntwavesize] = (speed-1) >> 8;
+                        ntnotetbl[ntwavesize] = (speed-1) & 0xff;
                         slidemap[gtcmddata+0x100] = ntwavesize+1;
                         ntwavesize++;
                     }
