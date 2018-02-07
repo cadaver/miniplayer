@@ -208,6 +208,14 @@ Play_FiltNext:  lda filtNextTbl-1,y
                 sta Play_FiltPos+1
                 jmp Play_FiltDone
 
+Play_NoNewIns:  clc
+                adc chnTrans,x
+                ora #$80
+                sta chnNote,x
+                lda chnIns,x
+                bpl Play_HardRestart
+                jmp Play_Rest
+
 Play_Commands:  cmp #KEYOFF
                 if PLAYER_SFX = 2
                 beq Play_KeyoffSfxCheck
@@ -249,16 +257,17 @@ Play_MasterVol: ora #$0f                        ;Can be modified for fadein/out
 
                 if PLAYER_SFX != 1
 Play_ChnExec:   inc chnCounter,x
-                bne Play_NoNewNotes
-Play_NewNotes:  ldy chnSongPos,x
+                bmi Play_PulseExec
+                bne Play_Reload
+                ldy chnSongPos,x
                 else
 Play_ChnExec:   ldy chnSongPos,x
                 beq Play_JumpToSfx
                 inc chnCounter,x
-                bne Play_NoNewNotes
+                bmi Play_PulseExec
+                bne Play_Reload
                 endif
-
-                lda (trackPtrLo),y
+Play_NewNotes:  lda (trackPtrLo),y
                 tay
                 lda pattTblLo-1,y
                 sta pattPtrLo
@@ -305,85 +314,18 @@ Play_NoPattEnd: tya
                 endif
                 rts
 
-                if PLAYER_SFX = 1
-Play_JumpToSfx: jmp Play_SfxExec
-                endif
-
-Play_NoNewIns:  clc
-                adc chnTrans,x
-                ora #$80
-                sta chnNote,x
-                lda chnIns,x
-                bpl Play_HardRestart
-                bmi Play_Rest
-
-Play_LegatoNoteInit:
-                tya
-                and #$7f
-                tay
-                bpl Play_FinishLegatoInit
-
-                if PLAYER_SFX = 2
-Play_JumpToSfx: jmp Play_SfxExec
-                endif
-
-Play_NoNewNotes:bmi Play_PulseExec
-                lda chnDuration,x
+Play_Reload:    lda chnDuration,x
                 sta chnCounter,x
                 lda chnPattPos,x
-                bne Play_NoSequencer
-
-Play_Sequencer: ldy chnSongPos,x
-                lda (trackPtrLo),y
-                bmi Play_SongTrans
-                bne Play_SequencerDone
-Play_SongJump:  iny
-                lda (trackPtrLo),y
-                tay
-                lda (trackPtrLo),y
-                bpl Play_NoSongJumpTrans
-Play_SongTrans: sta chnTrans,x
-                iny
-Play_NoSongJumpTrans:
-                tya
-                sta chnSongPos,x
-Play_SequencerDone:
-                if PLAYER_SFX = 2
-                lda chnSfxPtrHi,x
-                bne Play_JumpToSfx
-                endif
-                lda chnNote,x
-                bpl Play_WaveExec
-
-Play_NewNoteInit:
-                and #$7f
-                sta chnNote,x                   ;Reset newnote-flag
-                ldy chnIns,x
-                bmi Play_LegatoNoteInit
-Play_HRNoteInit:lda insAD-1,y                   ;Instruments are 1-indexed just so that the converter can
-                sta $d405,x                     ;differentiate between "no instrument change" and the first
-                lda insSR-1,y                   ;instrument. Strictly speaking they wouldn't need to be
-                sta $d406,x
-                lda #$09                        ;Fixed 1stframe wave
-                sta $d404,x
-Play_FinishLegatoInit:
-                lda insPulsePos-1,y
-                beq Play_SkipPulseInit
-                sta chnPulsePos,x
-Play_SkipPulseInit:
-                lda insFiltPos-1,y
-                beq Play_SkipFiltInit
-                sta Play_FiltPos+1
-Play_SkipFiltInit:
-                lda insWavePos-1,y
-Play_SetWavePos:sta chnWavePos,x
-                lda #$00
-                sta chnWaveTime,x
-                rts
-
+                beq Play_Sequencer
 Play_NoSequencer:
                 lda chnNote,x
-                bmi Play_NewNoteInit
+                bpl Play_PulseExec
+                jmp Play_NewNoteInit
+
+                if PLAYER_SFX > 0
+Play_JumpToSfx: jmp Play_SfxExec
+                endif
 
 Play_PulseExec: if PLAYER_SFX = 2
                 lda chnSfxPtrHi,x
@@ -431,6 +373,29 @@ Play_WaveDelayNotOver:
                 inc chnWaveTime,x
                 rts
 
+Play_Sequencer: ldy chnSongPos,x
+                lda (trackPtrLo),y
+                bmi Play_SongTrans
+                bne Play_SequencerDone
+Play_SongJump:  iny
+                lda (trackPtrLo),y
+                tay
+                lda (trackPtrLo),y
+                bpl Play_NoSongJumpTrans
+Play_SongTrans: sta chnTrans,x
+                iny
+Play_NoSongJumpTrans:
+                tya
+                sta chnSongPos,x
+Play_SequencerDone:
+                if PLAYER_SFX = 2
+                lda chnSfxPtrHi,x
+                bne Play_JumpToSfx
+                endif
+                lda chnNote,x
+                bpl Play_WaveExec
+                jmp Play_NewNoteInit
+
 Play_PulseInit: lda pulseNextTbl-$81,y
                 sta chnPulsePos,x
                 lda pulseLimitTbl-$81,y
@@ -461,17 +426,23 @@ Play_VibNoDir2: sbc #$02
 Play_VibUp:     adc waveNextTbl-1,y
                 sta chnFreqLo,x
                 sta $d400,x
-                bcc Play_WaveDone
+                bcc Play_VibDone
                 lda chnFreqHi,x
                 adc #$00
                 jmp Play_StoreFreqHi
 Play_VibDown:   sbc waveNextTbl-1,y
                 sta chnFreqLo,x
                 sta $d400,x
-                bcs Play_WaveDone
+                bcs Play_VibDone
                 lda chnFreqHi,x
                 sbc #$00
                 jmp Play_StoreFreqHi
+
+Play_LegatoNoteInit:
+                tya
+                and #$7f
+                tay
+                bpl Play_FinishLegatoInit
 
 Play_Slide:     lda chnFreqLo,x
                 adc noteTbl-1,y                 ;Note: speed must be stored as speed-1 due to C=1 here
@@ -480,6 +451,32 @@ Play_Slide:     lda chnFreqLo,x
                 lda waveNextTbl-1,y
 Play_SfxFreqMod:adc chnFreqHi,x
                 jmp Play_StoreFreqHi
+
+Play_NewNoteInit:
+                and #$7f
+                sta chnNote,x                   ;Reset newnote-flag
+                ldy chnIns,x
+                bmi Play_LegatoNoteInit
+Play_HRNoteInit:lda insAD-1,y                   ;Instruments are 1-indexed just so that the converter can
+                sta $d405,x                     ;differentiate between "no instrument change" and the first
+                lda insSR-1,y                   ;instrument. Strictly speaking they wouldn't need to be
+                sta $d406,x
+                lda #$09                        ;Fixed 1stframe wave
+                sta $d404,x
+Play_FinishLegatoInit:
+                lda insPulsePos-1,y
+                beq Play_SkipPulseInit
+                sta chnPulsePos,x
+Play_SkipPulseInit:
+                lda insFiltPos-1,y
+                beq Play_SkipFiltInit
+                sta Play_FiltPos+1
+Play_SkipFiltInit:
+                lda insWavePos-1,y
+Play_SetWavePos:sta chnWavePos,x
+                lda #$00
+                sta chnWaveTime,x
+Play_VibDone:   rts
 
                 if PLAYER_SFX > 0
 
