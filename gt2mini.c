@@ -638,6 +638,145 @@ void convertsong(void)
     ntpulsenexttbl[ntpulsesize] = 0;
     ntpulsesize++;
 
+    // Convert the whole pulsetable first
+    {
+        int sp = 0;
+        int pulsevalue = 0;
+
+        while (sp < 256 && ntpulsesize < 128)
+        {
+            unsigned char time = ltable[PTBL][sp];
+            unsigned char spd = rtable[PTBL][sp];
+
+            if (sp > 0 && time == 0x00 && ltable[PTBL][sp-1] == 0xff)
+                break;
+
+            pulseposmap[sp+1] = (ntpulsesize + 1) | (time & 0x80);
+            sp++;
+
+            if (time != 0xff && spd & 0xf)
+            {
+                printf("Warning: lowest 4 bits of pulse aren't supported\n");
+            }
+
+            if (time == 0xff)
+            {
+                pulseposmap[sp] = ntpulsesize;
+                continue;
+            }
+            else if (time & 0x80)
+            {
+                ntpulselimittbl[ntpulsesize] = (time & 0xf) | (spd & 0xf0);
+                ntpulsespdtbl[ntpulsesize] = 0;
+                ntpulsenexttbl[ntpulsesize] = ntpulsesize+1+1;
+                if (ntpulsesize > 1 && ntpulsenexttbl[ntpulsesize-1] == ntpulsesize+1)
+                    ntpulsenexttbl[ntpulsesize-1] |= 0x80;
+                pulsevalue = ((time & 0xf) << 8) | spd;
+                ++ntpulsesize;
+            }
+            else
+            {
+                if (spd < 0x80)
+                    pulsevalue += time*spd;
+                else
+                    pulsevalue += time*((int)spd-0x100);
+                ntpulselimittbl[ntpulsesize] = (pulsevalue >> 8) | (pulsevalue & 0xf0);
+                if (spd < 0x80)
+                    ntpulsespdtbl[ntpulsesize] = spd & 0xf0;
+                else
+                    ntpulsespdtbl[ntpulsesize] = (spd & 0xf0) - 1;
+                ntpulsenexttbl[ntpulsesize] = ntpulsesize+1+1;
+                ++ntpulsesize;
+            }
+        }
+        
+        // Fix jumps
+        sp = 0;
+        while (sp < 256)
+        {
+            unsigned char time = ltable[PTBL][sp];
+            unsigned char spd = rtable[PTBL][sp];
+
+            if (sp > 0 && time == 0x00 && ltable[PTBL][sp-1] == 0xff)
+                break;
+            if (time == 0xff)
+            {
+                ntpulsenexttbl[(pulseposmap[sp+1]&0x7f)-1] = spd ? pulseposmap[spd] : 0;
+            }
+            ++sp;
+        }
+    }
+    
+    // Convert the whole filtertable
+    {
+        int sp = 0;
+        unsigned char cutoffvalue = 0;
+
+        while (sp < 256 && ntfiltsize < 128)
+        {
+            unsigned char time = ltable[FTBL][sp];
+            unsigned char spd = rtable[FTBL][sp];
+
+            if (sp > 0 && time == 0x00 && ltable[FTBL][sp-1] == 0xff)
+                break;
+
+            filtposmap[sp+1] = (ntfiltsize + 1) | (time & 0x80);
+            sp++;
+
+            if (time == 0xff)
+            {
+                filtposmap[sp] = ntfiltsize;
+                continue;
+            }
+            else if (time & 0x80)
+            {
+                if (time & 0x40)
+                    printf("Warning: highpass filter not supported\n");
+                ntfiltspdtbl[ntfiltsize] = (time & 0x30) | (spd & 0xcf);
+                ntfiltnexttbl[ntfiltsize] = ntfiltsize+1+1;
+                if (ltable[FTBL][sp] != 0)
+                    printf("Warning: filter init-step not followed by set cutoff-step\n");
+                if (ntfiltsize > 1 && ntfiltnexttbl[ntfiltsize-1] == ntfiltsize+1)
+                    ntfiltnexttbl[ntfiltsize-1] |= 0x80;
+                ++ntfiltsize;
+            }
+            else if (time == 0 && ntfiltsize > 0)
+            {
+                // Fill in the initial cutoff value of the init step above
+                ntfiltlimittbl[ntfiltsize-1] = spd;
+                cutoffvalue = spd;
+            }
+            else
+            {
+                if (spd < 0x80)
+                    cutoffvalue += time*spd;
+                else
+                    cutoffvalue += time*((int)spd-0x100);
+                ntfiltlimittbl[ntfiltsize] = cutoffvalue;
+                ntfiltspdtbl[ntfiltsize] = spd;
+                ntfiltnexttbl[ntfiltsize] = ntfiltsize+1+1;
+                ++ntfiltsize;
+            }
+        }
+
+        // Fix jumps
+        sp = 0;
+        while (sp < 256)
+        {
+            unsigned char time = ltable[FTBL][sp];
+            unsigned char spd = rtable[FTBL][sp];
+
+            if (sp > 0 && time == 0x00 && ltable[FTBL][sp-1] == 0xff)
+                break;
+            if (time == 0xff)
+            {
+                printf("Fix filterjump at %d (sourcepos %d) to %d\n", (filtposmap[sp]&0x7f), sp, spd ? filtposmap[spd] : 0);
+                ntfiltnexttbl[(filtposmap[sp+1]&0x7f)-1] = spd ? filtposmap[spd] : 0;
+            }
+            ++sp;
+        }
+    }
+
     for (e = 1; e <= highestusedinstr; e++)
     {
         int existingwavepos = 0;
@@ -774,122 +913,12 @@ void convertsong(void)
                 ntcmdpulsepos[ntcmdsize] = 1; // Stop pulse-step, for saving rastertime for triangle/sawtooth/noise only instruments
         }
         else
-        {
-            int existingpulsepos = pulseposmap[instr[e].ptr[PTBL]];
+            ntcmdpulsepos[ntcmdsize] = pulseposmap[instr[e].ptr[PTBL]];
 
-            if (existingpulsepos == 0)
-            {
-                int sp = instr[e].ptr[PTBL]-1;
-                int pulsevalue = 0;
-
-                while (sp < 256 && ntpulsesize < 128)
-                {
-                    unsigned char time = ltable[PTBL][sp];
-                    unsigned char spd = rtable[PTBL][sp];
-                    pulseposmap[sp+1] = (ntpulsesize + 1) | (time & 0x80);
-                    sp++;
-
-                    if (time != 0xff && spd & 0xf)
-                    {
-                        printf("Warning: lowest 4 bits of pulse aren't supported\n");
-                    }
-                    
-                    if (time == 0xff)
-                    {
-                        ntpulsenexttbl[ntpulsesize-1] = pulseposmap[spd];
-                        break;
-                    }
-                    else if (time & 0x80)
-                    {
-                        ntpulselimittbl[ntpulsesize] = (time & 0xf) | (spd & 0xf0);
-                        ntpulsespdtbl[ntpulsesize] = 0;
-                        ntpulsenexttbl[ntpulsesize] = ntpulsesize+1+1;
-                        if (ntpulsesize > 1 && ntpulsenexttbl[ntpulsesize-1] == ntpulsesize+1)
-                            ntpulsenexttbl[ntpulsesize-1] |= 0x80;
-                        pulsevalue = ((time & 0xf) << 8) | spd;
-                    }
-                    else
-                    {
-                        if (spd < 0x80)
-                            pulsevalue += time*spd;
-                        else
-                            pulsevalue += time*((int)spd-0x100);
-                        ntpulselimittbl[ntpulsesize] = (pulsevalue >> 8) | (pulsevalue & 0xf0);
-                        if (spd < 0x80)
-                            ntpulsespdtbl[ntpulsesize] = spd & 0xf0;
-                        else
-                            ntpulsespdtbl[ntpulsesize] = (spd & 0xf0) - 1;
-                        ntpulsenexttbl[ntpulsesize] = ntpulsesize+1+1;
-                    }
-
-                    ++ntpulsesize;
-                }
-                existingpulsepos = pulseposmap[instr[e].ptr[PTBL]];
-            }
-            
-            ntcmdpulsepos[ntcmdsize] = existingpulsepos;
-        }
-        
         if (!instr[e].ptr[FTBL])
-        {
             ntcmdfiltpos[ntcmdsize] = 0;
-        }
         else
-        {
-            int existingfiltpos = filtposmap[instr[e].ptr[FTBL]];
-
-            if (existingfiltpos == 0)
-            {
-                int sp = instr[e].ptr[FTBL]-1;
-                unsigned char cutoffvalue = 0;
-
-                while (sp < 256 && ntfiltsize < 128)
-                {
-                    unsigned char time = ltable[FTBL][sp];
-                    unsigned char spd = rtable[FTBL][sp];
-                    filtposmap[sp+1] = (ntfiltsize + 1) | (time & 0x80);
-                    sp++;
-
-                    if (time == 0xff && ntfiltsize > 0)
-                    {
-                        ntfiltnexttbl[ntfiltsize-1] = filtposmap[spd];
-                        break;
-                    }
-                    else if (time & 0x80)
-                    {
-                        if (time & 0x40)
-                            printf("Warning: highpass filter not supported\n");
-                        ntfiltspdtbl[ntfiltsize] = (time & 0x30) | (spd & 0xcf);
-                        ntfiltnexttbl[ntfiltsize] = ntfiltsize+1+1;
-                        if (ltable[FTBL][sp] != 0)
-                            printf("Warning: filter init-step not followed by set cutoff-step\n");
-                        if (ntfiltsize > 1 && ntfiltnexttbl[ntfiltsize-1] == ntfiltsize+1)
-                            ntfiltnexttbl[ntfiltsize-1] |= 0x80;
-                        ++ntfiltsize;
-                    }
-                    else if (time == 0 && ntfiltsize > 0)
-                    {
-                        // Fill in the initial cutoff value of the init step above
-                        ntfiltlimittbl[ntfiltsize-1] = spd;
-                        cutoffvalue = spd;
-                    }
-                    else
-                    {
-                        if (spd < 0x80)
-                            cutoffvalue += time*spd;
-                        else
-                            cutoffvalue += time*((int)spd-0x100);
-                        ntfiltlimittbl[ntfiltsize] = cutoffvalue;
-                        ntfiltspdtbl[ntfiltsize] = spd;
-                        ntfiltnexttbl[ntfiltsize] = ntfiltsize+1+1;
-                        ++ntfiltsize;
-                    }
-                }
-                existingfiltpos = filtposmap[instr[e].ptr[FTBL]];
-            }
-            
-            ntcmdfiltpos[ntcmdsize] = existingfiltpos;
-        }
+            ntcmdfiltpos[ntcmdsize] = filtposmap[instr[e].ptr[FTBL]];
 
         instrmap[e] = ntcmdsize+1;
         ntcmdsize++;
@@ -1159,21 +1188,22 @@ void convertsong(void)
         for (c = 0; c < MAX_PATTROWS+1;)
         {
             int merge = 0;
-            if (notecolumn[c+1] != NT_ENDPATT)
+            
+            if (notecolumn[c] == NT_ENDPATT || notecolumn[c+1] == NT_ENDPATT)
+                break;
+
+            if ((durcolumn[c] + durcolumn[c+1]) <= maxdur && cmdcolumn[c+1] == 0)
             {
-                if ((durcolumn[c] + durcolumn[c+1]) <= maxdur && cmdcolumn[c+1] == 0)
-                {
-                    if (notecolumn[c] == NT_KEYOFF && notecolumn[c+1] == NT_KEYOFF)
-                        merge = 1;
-                    else if (notecolumn[c] == NT_REST && notecolumn[c+1] == NT_REST)
-                        merge = 1;
-                    else if (notecolumn[c] == NT_KEYOFF && notecolumn[c+1] == NT_REST)
-                        merge = 1;
-                    else if (notecolumn[c] == NT_WAVEPTR && notecolumn[c+1] == NT_REST)
-                        merge = 1;
-                    else if (notecolumn[c] >= NT_FIRSTNOTE && notecolumn[c] <= NT_LASTNOTE && notecolumn[c+1] == NT_REST)
-                        merge = 1;
-                }
+                if (notecolumn[c] == NT_KEYOFF && notecolumn[c+1] == NT_KEYOFF)
+                    merge = 1;
+                else if (notecolumn[c] == NT_REST && notecolumn[c+1] == NT_REST)
+                    merge = 1;
+                else if (notecolumn[c] == NT_KEYOFF && notecolumn[c+1] == NT_REST)
+                    merge = 1;
+                else if (notecolumn[c] == NT_WAVEPTR && notecolumn[c+1] == NT_REST)
+                    merge = 1;
+                else if (notecolumn[c] >= NT_FIRSTNOTE && notecolumn[c] <= NT_LASTNOTE && notecolumn[c+1] == NT_REST)
+                    merge = 1;
             }
 
             if (merge)
@@ -1194,28 +1224,29 @@ void convertsong(void)
         // Check if two consecutive durations can be averaged
         for (c = 0; c < MAX_PATTROWS+1; c++)
         {
-            if (notecolumn[c+1] != NT_ENDPATT)
+            int sum = durcolumn[c] + durcolumn[c+1];
+            int average = 0;
+
+            if (notecolumn[c] == NT_ENDPATT || notecolumn[c+1] == NT_ENDPATT)
+                break;
+
+            if (!(sum & 1) && durcolumn[c] != durcolumn[c+1] && cmdcolumn[c+1] == 0 && (notecolumn[c+2] == NT_ENDPATT || durcolumn[c+2] != durcolumn[c+1]))
             {
-                int sum = durcolumn[c] + durcolumn[c+1];
-                int average = 0;
-                if (!(sum & 1) && durcolumn[c] != durcolumn[c+1] && cmdcolumn[c+1] == 0 && (notecolumn[c+2] == NT_ENDPATT || durcolumn[c+2] != durcolumn[c+1]))
-                {
-                    if (notecolumn[c] == NT_KEYOFF && notecolumn[c+1] == NT_KEYOFF)
-                        average = 1;
-                    else if (notecolumn[c] == NT_REST && notecolumn[c+1] == NT_REST)
-                        average = 1;
-                    else if (notecolumn[c] == NT_KEYOFF && notecolumn[c+1] == NT_REST)
-                        average = 1;
-                    else if (notecolumn[c] == NT_WAVEPTR && notecolumn[c+1] == NT_REST)
-                        average = 1;
-                    else if (notecolumn[c] >= NT_FIRSTNOTE && notecolumn[c] <= NT_LASTNOTE && notecolumn[c+1] == NT_REST)
-                        average = 1;
-                }
-                if (average == 1)
-                {
-                    durcolumn[c] = durcolumn[c+1] = sum/2;
-                    c++;
-                }
+                if (notecolumn[c] == NT_KEYOFF && notecolumn[c+1] == NT_KEYOFF)
+                    average = 1;
+                else if (notecolumn[c] == NT_REST && notecolumn[c+1] == NT_REST)
+                    average = 1;
+                else if (notecolumn[c] == NT_KEYOFF && notecolumn[c+1] == NT_REST)
+                    average = 1;
+                else if (notecolumn[c] == NT_WAVEPTR && notecolumn[c+1] == NT_REST)
+                    average = 1;
+                else if (notecolumn[c] >= NT_FIRSTNOTE && notecolumn[c] <= NT_LASTNOTE && notecolumn[c+1] == NT_REST)
+                    average = 1;
+            }
+            if (average == 1)
+            {
+                durcolumn[c] = durcolumn[c+1] = sum/2;
+                c++;
             }
         }
         
@@ -1224,6 +1255,7 @@ void convertsong(void)
         {
             if (notecolumn[c] == NT_ENDPATT || notecolumn[c+1] == NT_ENDPATT)
                 break;
+
             if (durcolumn[c+1] == durcolumn[c-1] && durcolumn[c] == 2*durcolumn[c-1] && notecolumn[c] >= NT_FIRSTNOTE && notecolumn[c] <= NT_LASTNOTE)
             {
                 int d;
