@@ -1539,7 +1539,8 @@ void saventsong(const char* songfilename)
     fprintf(out, "  dc.b %d\n", ntwavesize);
     fprintf(out, "  dc.b %d\n", ntpulsesize);
     fprintf(out, "  dc.b %d\n", ntfiltsize);
-
+    fprintf(out, "\n");
+    
     fprintf(out, "songTbl:\n");
     for (c = 0; c <= highestusedsong; ++c)
     {
