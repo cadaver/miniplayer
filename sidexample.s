@@ -1,4 +1,5 @@
-; .sid example of using the playroutine. Press fire to trigger a sound effect.
+; .sid example of using the playroutine. Assembles the music data directly after 
+; the player. SetMusicData not used.
 
 
                 processor 6502
@@ -39,6 +40,7 @@ SUBTUNES        = 1
 
 PLAYER_ZPBASE   = $fc
 PLAYER_SFX      = 0
+PLAYER_SETDATA  = 0
 
         ; Player + musicdata
 

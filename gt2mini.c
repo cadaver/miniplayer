@@ -493,7 +493,7 @@ int makespeedtable(unsigned data, int mode, int makenew)
 
 void printsonginfo(void)
 {
-    printf("Songs: %d Patterns: %d Instruments: %d\n", highestusedsong+1, highestusedpatt+1, highestusedinstr+1);
+    printf("Songs: %d Patterns: %d Instruments: %d\n", highestusedsong+1, highestusedpatt+1, highestusedinstr);
 }
 
 void clearntsong(void)
@@ -1532,6 +1532,14 @@ void saventsong(const char* songfilename)
         exit(1);
     }
 
+    fprintf(out, "musicHeader:\n");
+    fprintf(out, "  dc.b %d\n", (highestusedsong+1)*5);
+    fprintf(out, "  dc.b %d\n", highestusedpatt+1);
+    fprintf(out, "  dc.b %d\n", ntcmdsize);
+    fprintf(out, "  dc.b %d\n", ntwavesize);
+    fprintf(out, "  dc.b %d\n", ntpulsesize);
+    fprintf(out, "  dc.b %d\n", ntfiltsize);
+
     fprintf(out, "songTbl:\n");
     for (c = 0; c <= highestusedsong; ++c)
     {
@@ -1542,13 +1550,6 @@ void saventsong(const char* songfilename)
     }
     fprintf(out, "\n");
 
-    for (c = 0; c <= highestusedsong; ++c)
-    {
-        char namebuf[80];
-        sprintf(namebuf, "song%d", c);
-        writeblock(out, namebuf, &nttracks[c][0], ntsongtotallen[c]);
-    }
-
     fprintf(out, "pattTblLo:\n");
     for (c = 0; c <= highestusedpatt; ++c)
         fprintf(out, "  dc.b <patt%d\n", c);
@@ -1558,13 +1559,6 @@ void saventsong(const char* songfilename)
         fprintf(out, "  dc.b >patt%d\n", c);
     fprintf(out, "\n");
 
-    for (c = 0; c <= highestusedpatt; ++c)
-    {
-        char namebuf[80];
-        sprintf(namebuf, "patt%d", c);
-        writeblock(out, namebuf, &ntpatterns[c][0], ntpattlen[c]);
-    }
-    
     writeblock(out, "insAD", ntcmdad, ntcmdsize);
     writeblock(out, "insSR", ntcmdsr, ntcmdsize);
     writeblock(out, "insWavePos", ntcmdwavepos, ntcmdsize);
@@ -1579,6 +1573,20 @@ void saventsong(const char* songfilename)
     writeblock(out, "filtLimitTbl", ntfiltlimittbl, ntfiltsize);
     writeblock(out, "filtSpdTbl", ntfiltspdtbl, ntfiltsize);
     writeblock(out, "filtNextTbl", ntfiltnexttbl, ntfiltsize);
+
+    for (c = 0; c <= highestusedsong; ++c)
+    {
+        char namebuf[80];
+        sprintf(namebuf, "song%d", c);
+        writeblock(out, namebuf, &nttracks[c][0], ntsongtotallen[c]);
+    }
+
+    for (c = 0; c <= highestusedpatt; ++c)
+    {
+        char namebuf[80];
+        sprintf(namebuf, "patt%d", c);
+        writeblock(out, namebuf, &ntpatterns[c][0], ntpattlen[c]);
+    }
 }
 
 void writeblock(FILE* out, const char* name, unsigned char* data, int len)

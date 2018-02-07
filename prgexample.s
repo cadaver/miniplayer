@@ -1,4 +1,5 @@
 ; .prg example of using the playroutine. Press fire to trigger a sound effect.
+; Uses SetMusicData to mimic a "game" scenario with loadable music modules.
 
                 processor 6502
                 org $0801
@@ -27,6 +28,9 @@ start:          sei
                 lda $dc0d
                 lda $d019
                 sta $d019
+                lda #<$1000
+                ldx #>$1000
+                jsr SetMusicData
                 cli
 loop:           lda #68
                 sta $0400
@@ -93,17 +97,20 @@ raster_nofire:  pla
 
 prevjoy:        dc.b 0
 
-                org $1000
-
         ; Player configuration
 
 PLAYER_ZPBASE   = $fb
 PLAYER_SFX      = 2
+PLAYER_SETDATA  = 1
 
-        ; Player + musicdata
+        ; Player
 
                 include player.s
-                include musicdata.s
+
+        ; Music module (assembled separately)
+        
+                org $1000
+                incbin musicmodule.bin
 
         ; SFX data
 
