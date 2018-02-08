@@ -741,51 +741,6 @@ Play_SongTblAccess3:
                 sta $d404,x
                 rts
 
-chnTrans:       dc.b $80
-chnSongPos:     dc.b 0
-chnPattPos:     dc.b 0
-chnDuration:    dc.b 0
-chnCounter:     dc.b 0
-chnNote:        dc.b 0
-chnIns:         dc.b 0
-
-                dc.b $80,0,0,0,0,0,0
-                dc.b $80,0,0,0,0,0,0
-
-chnWave:        dc.b 0
-chnWavePos:     dc.b 0
-chnWaveTime:    dc.b 0
-chnPulse:       dc.b 0
-chnPulsePos:    dc.b 0
-chnFreqLo:      dc.b 0
-chnFreqHi:      dc.b 0
-
-                dc.b 0,0,0,0,0,0,0
-                dc.b 0,0,0,0,0,0,0
-
-                if PLAYER_SFX = 2
-chnSfxPos:      dc.b 0
-chnSfxPtrLo:    dc.b 0
-chnSfxPtrHi:    dc.b 0
-                dc.b 0
-                dc.b 0
-                dc.b 0
-                dc.b 0
-
-                dc.b 0,0,0,0,0,0,0
-                dc.b 0,0,0
-                endif
-
-                if PLAYER_SFX = 1
-chnSfxPos       = chnCounter
-chnSfxPtrLo     = chnNote
-chnSfxPtrHi     = chnIns
-                endif
-
-                if PLAYER_SFX > 0
-chnSfxTime      = chnWaveTime
-chnSfxFreqMod   = chnWavePos
-                endif
 freqTbl:
                 dc.w $022d,$024e,$0271,$0296,$02be,$02e8,$0314,$0343,$0374,$03a9,$03e1,$041c
                 dc.w $045a,$049c,$04e2,$052d,$057c,$05cf,$0628,$0685,$06e8,$0752,$07c1,$0837
@@ -911,4 +866,52 @@ filtLimitTbl:
 filtSpdTbl:
 filtNextTbl:
 
+                endif
+
+        ; Playroutine variables
+
+chnTrans:       dc.b $80
+chnSongPos:     dc.b 0
+chnPattPos:     dc.b 0
+chnDuration:    dc.b 0
+chnCounter:     dc.b 0
+chnNote:        dc.b 0
+chnIns:         dc.b 0
+
+                dc.b $80,0,0,0,0,0,0
+                dc.b $80,0,0,0,0,0,0
+
+chnWave:        dc.b 0
+chnWavePos:     dc.b 0
+chnWaveTime:    dc.b 0
+chnPulse:       dc.b 0
+chnPulsePos:    dc.b 0
+chnFreqLo:      dc.b 0
+chnFreqHi:      dc.b 0
+
+                dc.b 0,0,0,0,0,0,0
+                dc.b 0,0,0,0,0,0,0
+
+                if PLAYER_SFX = 2
+chnSfxPos:      dc.b 0
+chnSfxPtrLo:    dc.b 0
+chnSfxPtrHi:    dc.b 0
+                dc.b 0
+                dc.b 0
+                dc.b 0
+                dc.b 0
+
+                dc.b 0,0,0,0,0,0,0
+                dc.b 0,0,0
+                endif
+
+                if PLAYER_SFX = 1
+chnSfxPos       = chnCounter
+chnSfxPtrLo     = chnNote
+chnSfxPtrHi     = chnIns
+                endif
+
+                if PLAYER_SFX > 0
+chnSfxTime      = chnWaveTime
+chnSfxFreqMod   = chnWavePos
                 endif
