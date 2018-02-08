@@ -104,6 +104,7 @@ int mpfiltsize = 0;
 FILE* out = 0;
 int baremode = 0;
 int startaddress = -1;
+int endaddress = -1;
 
 unsigned short freqtbl[] = {
     0x022d,0x024e,0x0271,0x0296,0x02be,0x02e8,0x0314,0x0343,0x0374,0x03a9,0x03e1,0x041c,
@@ -142,7 +143,8 @@ int main(int argc, const char** argv)
         printf("Converter from GT2 format to minimal player. Outputs source code.\n"
                "Usage: gt2mini <input> <output> [options]\n"
                "-b     Bare mode; do not add header for music module operation\n"
-               "-sxxxx Include hexadecimal start address & Dasm processor statement\n");
+               "-sxxxx Include hexadecimal start address & Dasm processor statement\n"
+               "-exxxx Calculate start address from specified hexadecimal end address\n");
         return 1;
     }
 
@@ -157,6 +159,9 @@ int main(int argc, const char** argv)
                 break;
             case 's':
                 startaddress = strtoul(&argv[c][2], 0, 16);
+                break;
+            case 'e':
+                endaddress = strtoul(&argv[c][2], 0, 16);
                 break;
             }
         }
@@ -1548,6 +1553,20 @@ void getpatttempos(void)
 void savempsong(const char* songfilename)
 {
     int c;
+    int totalsize = 0;
+
+    if (!baremode)
+        totalsize += 6;
+    totalsize += (highestusedsong+1) * 5;
+    totalsize += (highestusedpatt+1) * 2;
+    totalsize += mpinssize * 5;
+    totalsize += mpwavesize * 3;
+    totalsize += mppulsesize * 3;
+    totalsize += mpfiltsize * 3;
+    for (c = 0; c <= highestusedsong; ++c)
+        totalsize += mpsongtotallen[c];
+    for (c = 0; c <= highestusedpatt; ++c)
+        totalsize += mppattlen[c];
 
     out = fopen(songfilename, "wt");
     if (!out)
@@ -1556,7 +1575,10 @@ void savempsong(const char* songfilename)
         exit(1);
     }
 
-    if (startaddress > 0)
+    if (endaddress >= 0)
+        startaddress = endaddress - totalsize;
+
+    if (startaddress >= 0)
     {
         fprintf(out, "  org $%04x\n", startaddress);
         fprintf(out, "  processor 6502\n");
