@@ -1,4 +1,4 @@
-; .sid example of using the playroutine. Assembles the music data directly after 
+; .sid example of using the playroutine. Assembles the music data directly after
 ; the player. SetMusicData not used.
 
 
@@ -40,7 +40,7 @@ SUBTUNES        = 1
 
 PLAYER_ZPBASE   = $fc
 PLAYER_SFX      = 0
-PLAYER_SETDATA  = 0
+PLAYER_MODULES  = 0
 
         ; Player + musicdata
 

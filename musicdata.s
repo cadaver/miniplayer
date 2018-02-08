@@ -1,11 +1,3 @@
-musicHeader:
-  dc.b 5
-  dc.b 23
-  dc.b 23
-  dc.b 78
-  dc.b 29
-  dc.b 4
-
 songTbl:
   dc.w song0-1
   dc.b $01

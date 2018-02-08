@@ -101,7 +101,7 @@ prevjoy:        dc.b 0
 
 PLAYER_ZPBASE   = $fb
 PLAYER_SFX      = 2
-PLAYER_SETDATA  = 1
+PLAYER_MODULES  = 1
 
         ; Player
 

@@ -14,10 +14,10 @@
         ;         This has the effect of requiring extra channel variables and potentially
         ;         more rastertime.
         ;
-        ; PLAYER_SETDATA is whether the player can be pointed to new music data during runtime
-        ; (e.g. for loadable music.) In this mode, the SetMusicData routine should be called
-        ; before playback to set the music data address. Note that the music data itself
-        ; needs to be assembled to a fixed known address, so that trackdata & pattern
+        ; PLAYER_MODULES is whether the player can be pointed to new music modules during
+        ; runtime (e.g. loadable music.) In this mode, the SetMusicData routine should be
+        ; called before playback to set the music module address. Note that the music data
+        ; itself needs to be assembled to a fixed known address, so that trackdata & pattern
         ; addresses are correct within their respective tables.
 
 trackPtrLo      = PLAYER_ZPBASE+0
@@ -29,7 +29,8 @@ pattPtrHi       = PLAYER_ZPBASE+3
 sfxTemp         = PLAYER_ZPBASE+4
                 endif
 
-        ; Header data format for SetMusicData: (written out first by the converter)
+        ; Music module header format for SetMusicData: (written out first by the converter)
+        ;
         ; - Song table size
         ; - Number of patterns
         ; - Number of instruments
@@ -178,9 +179,9 @@ REST            = $7f
         ; Negative pulse speed values must have one subtracted from them, ie. if you have speed 
         ; $40 up, use $bf for down with same speed.
 
-                if PLAYER_SETDATA > 0
-                
-        ; Point player to new music data
+                if PLAYER_MODULES > 0
+
+        ; Point player to new music module
         ;
         ; A = music data address lowbyte
         ; X = music data address highbyte
@@ -794,7 +795,7 @@ freqTbl:
                 dc.w $45a1,$49c5,$4e28,$52cd,$57ba,$5cf1,$6278,$6853,$6e87,$751a,$7c10,$8371
                 dc.w $8b42,$9389,$9c4f,$a59b,$af74,$b9e2,$c4f0,$d0a6,$dd0e,$ea33,$f820,$ffff
 
-                if PLAYER_SETDATA > 0
+                if PLAYER_MODULES > 0
 
 fixupDestLoTbl: dc.b <Play_FiltNextTblM81Access
                 dc.b <Play_FiltNextTblM1Access

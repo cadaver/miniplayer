@@ -102,6 +102,8 @@ int mppulsesize = 0;
 int mpfiltsize = 0;
 
 FILE* out = 0;
+int baremode = 0;
+int startaddress = -1;
 
 unsigned short freqtbl[] = {
     0x022d,0x024e,0x0271,0x0296,0x02be,0x02e8,0x0314,0x0343,0x0374,0x03a9,0x03e1,0x041c,
@@ -133,11 +135,31 @@ void writeblock(FILE* out, const char* blockname, unsigned char* data, int len);
 
 int main(int argc, const char** argv)
 {
+    int c;
+
     if (argc < 3)
     {
         printf("Converter from GT2 format to minimal player. Outputs source code.\n"
-               "Usage: gt2mini <input> <output>");
+               "Usage: gt2mini <input> <output> [options]\n"
+               "-b     Bare mode; do not add header for music module operation\n"
+               "-sxxxx Include hexadecimal start address & Dasm processor statement\n");
         return 1;
+    }
+
+    for (c = 3; c < argc; ++c)
+    {
+        if (argv[c][0] == '-')
+        {
+            switch(argv[c][1])
+            {
+            case 'b':
+                baremode = 1;
+                break;
+            case 's':
+                startaddress = strtoul(&argv[c][2], 0, 16);
+                break;
+            }
+        }
     }
 
     loadsong(argv[1]);
@@ -1535,15 +1557,25 @@ void savempsong(const char* songfilename)
         exit(1);
     }
 
-    fprintf(out, "musicHeader:\n");
-    fprintf(out, "  dc.b %d\n", (highestusedsong+1)*5);
-    fprintf(out, "  dc.b %d\n", highestusedpatt+1);
-    fprintf(out, "  dc.b %d\n", mpinssize);
-    fprintf(out, "  dc.b %d\n", mpwavesize);
-    fprintf(out, "  dc.b %d\n", mppulsesize);
-    fprintf(out, "  dc.b %d\n", mpfiltsize);
-    fprintf(out, "\n");
-    
+    if (startaddress > 0)
+    {
+        fprintf(out, "  org $%04x\n", startaddress);
+        fprintf(out, "  processor 6502\n");
+        fprintf(out, "\n");
+    }
+
+    if (!baremode)
+    {
+        fprintf(out, "musicHeader:\n");
+        fprintf(out, "  dc.b %d\n", (highestusedsong+1)*5);
+        fprintf(out, "  dc.b %d\n", highestusedpatt+1);
+        fprintf(out, "  dc.b %d\n", mpinssize);
+        fprintf(out, "  dc.b %d\n", mpwavesize);
+        fprintf(out, "  dc.b %d\n", mppulsesize);
+        fprintf(out, "  dc.b %d\n", mpfiltsize);
+        fprintf(out, "\n");
+    }
+
     fprintf(out, "songTbl:\n");
     for (c = 0; c <= highestusedsong; ++c)
     {
