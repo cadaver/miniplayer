@@ -252,15 +252,15 @@ SetMusicData_AddDone:
         ;
         ; Sound effect data consists of control bytes followed by data, delays and endmark.
         ; Each control byte takes 1 frame to execute. The bits are evaluated from LSB first.
+        ; A sound always begins with a gateoff, so this does not need to be specified.
         ;
         ; $00       Endmark
-        ; $01-$3f   Control byte, bits:
-        ;               $01 Gateoff+HR, also resets internal variables. No other bits will be read.
-        ;               $02 First frame init, followed by AD,SR bytes
-        ;               $04 Set pulse, followed by nybble-reversed pulsewidth
-        ;               $08 Set wave, followed by waveform byte
-        ;               $10 Set frequency, followed by freq highbyte (also set to lowbyte)
-        ;               $20 Set freqmod, followed by 8-bit freqmod speed, which affects only highbyte
+        ; $01-$1f   Control byte, bits:
+        ;               $01 First frame init (sets fixed waveform $09), followed by AD,SR bytes
+        ;               $02 Set pulse, followed by nybble-reversed pulsewidth
+        ;               $04 Set wave, followed by waveform byte
+        ;               $08 Set frequency, followed by freq highbyte (also set to lowbyte)
+        ;               $10 Set freqmod, followed by 8-bit freqmod speed, which affects only highbyte
         ; $80-$ff   Delay, is negative similar to wavetable ($ff = one frame)
 
 PlaySfx:        sta chnSfxPtrLo,x
@@ -602,6 +602,13 @@ Play_VibDone:   rts
 
         ; Sound effect support code
 
+Play_SfxDelay:  sec
+                adc chnSfxTime,x
+                bne Play_SfxDelayOngoing
+Play_SfxDelayDone:
+                sta chnSfxTime,x
+                inc chnSfxPos,x                 ;Delay ended, run still effects only this frame
+                bne Play_SfxEffects
 Play_SfxDelayOngoing:
                 inc chnSfxTime,x
 Play_SfxEffects:lda chnSfxFreqMod,x
@@ -613,6 +620,17 @@ Play_SfxEnd:    sta chnSfxPtrHi,x
                 sta chnWavePos,x                ;Also reset wavepos when returning from sound FX to music
                 endif
 Play_SfxDone:   rts
+
+Play_SfxHR:     lda #$0f
+                sta $d406,x
+                lda chnWave,x
+                and #$fe
+                sta $d404,x
+                lda #$00
+                sta chnSfxFreqMod,x
+                sta chnSfxTime,x
+                inc chnSfxPos,x
+                rts
 
 Play_SfxExec:   if PLAYER_SFX = 1
                 lda chnSfxPtrHi,x
@@ -629,31 +647,15 @@ Play_SfxNoNewNote:
                 lda chnSfxPtrLo,x
                 sta pattPtrLo
                 ldy chnSfxPos,x
+                beq Play_SfxHR
+                dey
                 lda (pattPtrLo),y
+                bmi Play_SfxDelay
                 beq Play_SfxEnd
-                bpl Play_NoSfxDelay
-                sec
-                adc chnSfxTime,x
-                bne Play_SfxDelayOngoing
-Play_SfxDelayDone:
-                sta chnSfxTime,x
-                inc chnSfxPos,x                 ;Delay ended, run still effects only this frame
-                bne Play_SfxEffects
-Play_NoSfxDelay:sta sfxTemp
-Play_NoSfxEnd:  iny
-                lsr sfxTemp
-                bcc Play_NoSfxHR
-                lda #$0f
-                sta $d406,x
-                lda chnWave,x
-                and #$fe
-                sta $d404,x
-                lda #$00
-                sta chnSfxFreqMod,x
-                sta chnSfxTime,x
-                beq Play_NoSfxFreqMod
 
-Play_NoSfxHR:   lsr sfxTemp
+Play_SfxCommand:sta sfxTemp
+                iny
+                lsr sfxTemp
                 bcc Play_NoSfxFirstFrame
                 lda (pattPtrLo),y
                 sta $d405,x
@@ -695,6 +697,7 @@ Play_NoSfxFreq: lsr sfxTemp
                 iny
 
 Play_NoSfxFreqMod:
+                iny
                 tya
                 sta chnSfxPos,x
                 jmp Play_SfxEffects
@@ -741,8 +744,7 @@ Play_SongTblAccess3:
                 sta $d404,x
                 rts
 
-freqTbl:
-                dc.w $022d,$024e,$0271,$0296,$02be,$02e8,$0314,$0343,$0374,$03a9,$03e1,$041c
+freqTbl:        dc.w $022d,$024e,$0271,$0296,$02be,$02e8,$0314,$0343,$0374,$03a9,$03e1,$041c
                 dc.w $045a,$049c,$04e2,$052d,$057c,$05cf,$0628,$0685,$06e8,$0752,$07c1,$0837
                 dc.w $08b4,$0939,$09c5,$0a5a,$0af7,$0b9e,$0c4f,$0d0a,$0dd1,$0ea3,$0f82,$106e
                 dc.w $1168,$1271,$138a,$14b3,$15ee,$173c,$189e,$1a15,$1ba2,$1d46,$1f04,$20dc
@@ -913,5 +915,5 @@ chnSfxPtrHi     = chnIns
 
                 if PLAYER_SFX > 0
 chnSfxTime      = chnWaveTime
-chnSfxFreqMod   = chnWavePos
+chnSfxFreqMod   = chnFreqLo
                 endif

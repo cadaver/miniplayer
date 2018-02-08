@@ -114,12 +114,11 @@ PLAYER_MODULES  = 1
 
         ; SFX data
 
-soundeffect:    dc.b $01                        ;Hardrestart
-                dc.b $06,$00,$fa,$08            ;Init+ADSR+pulse
-                dc.b $18,$81,$c0                ;Wave+note
-                dc.b $18,$41,$0c                ;Wave+note
-                dc.b $18,$81,$20                ;Wave+note
-                dc.b $20,$ff                    ;Freqmod
-                dc.b $08,$80                    ;Wave (gate off)
+soundeffect:    dc.b $03,$00,$fa,$08            ;Init+ADSR+pulse
+                dc.b $0c,$81,$c0                ;Wave+note
+                dc.b $0c,$41,$0c                ;Wave+note
+                dc.b $0c,$81,$20                ;Wave+note
+                dc.b $10,$ff                    ;Freqmod
+                dc.b $04,$80                    ;Wave (gate off)
                 dc.b $f0                        ;Delay for 16 frames
                 dc.b $00                        ;End
