@@ -966,7 +966,7 @@ void convertsong(void)
         memset(durcolumn, 0, sizeof durcolumn);
         int pattlen = 0;
         int lastnoteins = -1;
-        int lastnotentins = -1;
+        int lastnotempins = -1;
         int lastdur;
         int lastwaveptr = 0;
         int d = 0;
@@ -1035,7 +1035,6 @@ void convertsong(void)
                         }
                         tptargetnote = note;
                         note = REST; // The actual toneportamento target note is just discarded, as there is no "stop at note" functionality in the player
-
                     }
                 }
                 else if (gtcmd == 0x1)
@@ -1073,7 +1072,7 @@ void convertsong(void)
             {
                 if (tpstepsleft < dur)
                 {
-                    mpinstr = getlegatoinstr(instr);
+                    mpinstr = getlegatoinstr(lastnoteins);
 
                     if (tpstepsleft == 0)
                     {
@@ -1102,7 +1101,7 @@ void convertsong(void)
                     ++d;
                     tptargetnote = 0;
                     lastwaveptr = 0; // TP ended, consider next waveptr command individually again
-                    lastnotentins = mpinstr;
+                    lastnotempins = mpinstr;
                     continue;
                 }
                 else
@@ -1116,11 +1115,11 @@ void convertsong(void)
                 lastwaveptr = 0; // If triggering a note, forget the last waveptr
 
                 notecolumn[d] = (note-pattbasetrans[e]-FIRSTNOTE-12)*2+MP_FIRSTNOTE;
-                if (mpinstr != lastnotentins)
+                if (mpinstr != lastnotempins)
                 {
                     cmdcolumn[d] = mpinstr;
                     lastnoteins = instr;
-                    lastnotentins = mpinstr;
+                    lastnotempins = mpinstr;
                 }
                 // If waveptr in combination with note, must split step
                 if (waveptr && waveptr != lastwaveptr)
