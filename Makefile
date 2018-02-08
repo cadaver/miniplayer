@@ -2,6 +2,8 @@ all: gt2mini.exe example.prg example.sid
 
 clean:
 	del *.exe
+	del *.prg
+	del *.sid
 
 gt2mini.exe: gt2mini.c fileio.c
 	gcc gt2mini.c fileio.c -ogt2mini.exe
