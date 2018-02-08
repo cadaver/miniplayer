@@ -20,21 +20,21 @@
 #define FTBL 2
 #define STBL 3
 
-#define MAX_NTSONGS 16
-#define MAX_NTPATT 127
-#define MAX_NTCMD 127
-#define MAX_NTPATTLEN 256
-#define MAX_NTSONGLEN 256
-#define MAX_NTTBLLEN 255
+#define MAX_MPSONGS 16
+#define MAX_MPPATT 127
+#define MAX_MPCMD 127
+#define MAX_MPPATTLEN 256
+#define MAX_MPSONGLEN 256
+#define MAX_MPTBLLEN 255
 
-#define NT_ENDPATT 0x00
-#define NT_FIRSTNOTE 0x02
-#define NT_LASTNOTE 0x7a
-#define NT_WAVEPTR 0x7c
-#define NT_KEYOFF 0x7e
-#define NT_REST 0x7f
-#define NT_NOCMD 0x1;
-#define NT_MAXDUR 128
+#define MP_ENDPATT 0x00
+#define MP_FIRSTNOTE 0x02
+#define MP_LASTNOTE 0x7a
+#define MP_WAVEPTR 0x7c
+#define MP_KEYOFF 0x7e
+#define MP_REST 0x7f
+#define MP_NOCMD 0x1;
+#define MP_MAXDUR 128
 
 INSTR instr[MAX_INSTR];
 unsigned char ltable[MAX_TABLES][MAX_TABLELEN];
@@ -60,35 +60,46 @@ int highestusedinstr;
 int highestusedsong;
 int defaultpatternlength = 64;
 int remappedpatterns = 0;
-int maxdur = NT_MAXDUR;
+int maxdur = MP_MAXDUR;
 
-unsigned char ntwavetbl[MAX_NTTBLLEN+1];
-unsigned char ntnotetbl[MAX_NTTBLLEN+1];
-unsigned char ntnexttbl[MAX_NTTBLLEN+1];
-unsigned char ntpulselimittbl[MAX_NTTBLLEN+1];
-unsigned char ntpulsespdtbl[MAX_NTTBLLEN+1];
-unsigned char ntpulsenexttbl[MAX_NTTBLLEN+1];
-unsigned char ntfiltlimittbl[MAX_NTTBLLEN+1];
-unsigned char ntfiltspdtbl[MAX_NTTBLLEN+1];
-unsigned char ntfiltnexttbl[MAX_NTTBLLEN+1];
+unsigned char mpwavetbl[MAX_MPTBLLEN+1];
+unsigned char mpnotetbl[MAX_MPTBLLEN+1];
+unsigned char mpwavenexttbl[MAX_MPTBLLEN+1];
+unsigned char mppulselimittbl[MAX_MPTBLLEN+1];
+unsigned char mppulsespdtbl[MAX_MPTBLLEN+1];
+unsigned char mppulsenexttbl[MAX_MPTBLLEN+1];
+unsigned char mpfiltlimittbl[MAX_MPTBLLEN+1];
+unsigned char mpfiltspdtbl[MAX_MPTBLLEN+1];
+unsigned char mpfiltnexttbl[MAX_MPTBLLEN+1];
 
-unsigned char ntpatterns[MAX_NTPATT][MAX_NTPATTLEN];
-unsigned char ntpattlen[MAX_NTPATT];
+unsigned char mppatterns[MAX_MPPATT][MAX_MPPATTLEN];
+unsigned char mppattlen[MAX_MPPATT];
 
-unsigned char nttracks[MAX_NTSONGS][MAX_NTSONGLEN];
-unsigned char ntsongstart[MAX_NTSONGS][3];
-unsigned char ntsongtotallen[MAX_NTSONGS];
+unsigned char mptracks[MAX_MPSONGS][MAX_MPSONGLEN];
+unsigned char mpsongstart[MAX_MPSONGS][3];
+unsigned char mpsongtotallen[MAX_MPSONGS];
 
-unsigned char ntcmdad[MAX_NTCMD];
-unsigned char ntcmdsr[MAX_NTCMD];
-unsigned char ntcmdwavepos[MAX_NTCMD];
-unsigned char ntcmdpulsepos[MAX_NTCMD];
-unsigned char ntcmdfiltpos[MAX_NTCMD];
+unsigned char mpinsad[MAX_MPCMD];
+unsigned char mpinssr[MAX_MPCMD];
+unsigned char mpinswavepos[MAX_MPCMD];
+unsigned char mpinspulsepos[MAX_MPCMD];
+unsigned char mpinsfiltpos[MAX_MPCMD];
 
-int ntcmdsize = 0;
-int ntwavesize = 0;
-int ntpulsesize = 0;
-int ntfiltsize = 0;
+unsigned char instrmap[256];
+unsigned char instrpulseused[256];
+unsigned char instrfirstwavepos[256];
+unsigned char instrlastwavepos[256];
+unsigned char legatoinstrmap[256];
+unsigned char waveposmap[256];
+unsigned char pulseposmap[256];
+unsigned char filtposmap[256];
+unsigned char slidemap[65536];
+unsigned char vibratomap[65536];
+
+int mpinssize = 0;
+int mpwavesize = 0;
+int mppulsesize = 0;
+int mpfiltsize = 0;
 
 FILE* out = 0;
 
@@ -108,12 +119,16 @@ void clearinstr(int num);
 void clearpattern(int num);
 void countpatternlengths(void);
 int makespeedtable(unsigned data, int mode, int makenew);
-void printsonginfo(void);
-void clearntsong(void);
+void primpsonginfo(void);
+void clearmpsong(void);
 void convertsong(void);
 void getpatttempos(void);
 void getpattbasetrans(void);
-void saventsong(const char* songfilename);
+unsigned char copywavetable(unsigned char instr);
+unsigned char getlegatoinstr(unsigned char instr);
+unsigned char getvibrato(unsigned char delay, unsigned char pos);
+unsigned char getslide(unsigned short speed);
+void savempsong(const char* songfilename);
 void writeblock(FILE* out, const char* blockname, unsigned char* data, int len);
 
 int main(int argc, const char** argv)
@@ -126,10 +141,10 @@ int main(int argc, const char** argv)
     }
 
     loadsong(argv[1]);
-    printsonginfo();
-    clearntsong();
+    primpsonginfo();
+    clearmpsong();
     convertsong();
-    saventsong(argv[2]);
+    savempsong(argv[2]);
     return 0;
 }
 
@@ -491,61 +506,49 @@ int makespeedtable(unsigned data, int mode, int makenew)
   return -1;
 }
 
-void printsonginfo(void)
+void primpsonginfo(void)
 {
     printf("Songs: %d Patterns: %d Instruments: %d\n", highestusedsong+1, highestusedpatt+1, highestusedinstr);
 }
 
-void clearntsong(void)
+void clearmpsong(void)
 {
-    memset(ntwavetbl, 0, sizeof ntwavetbl);
-    memset(ntnotetbl, 0, sizeof ntnotetbl);
-    memset(ntnexttbl, 0, sizeof ntnexttbl);
-    memset(ntpulselimittbl, 0, sizeof ntpulselimittbl);
-    memset(ntpulsespdtbl, 0, sizeof ntpulsespdtbl);
-    memset(ntpulsenexttbl, 0, sizeof ntpulsenexttbl);
-    memset(ntfiltlimittbl, 0, sizeof ntfiltlimittbl);
-    memset(ntfiltspdtbl, 0, sizeof ntfiltspdtbl);
-    memset(ntfiltnexttbl, 0, sizeof ntfiltnexttbl);
-    memset(ntpatterns, 0, sizeof ntpatterns);
-    memset(nttracks, 0, sizeof nttracks);
-    memset(ntcmdad, 0, sizeof ntcmdad);
-    memset(ntcmdsr, 0, sizeof ntcmdsr);
-    memset(ntcmdwavepos, 0, sizeof ntcmdwavepos);
-    memset(ntcmdpulsepos, 0, sizeof ntcmdpulsepos);
-    memset(ntcmdfiltpos, 0, sizeof ntcmdfiltpos);
-    ntcmdsize = 0;
-    ntwavesize = 0;
-    ntpulsesize = 0;
-    ntfiltsize = 0;
+    memset(mpwavetbl, 0, sizeof mpwavetbl);
+    memset(mpnotetbl, 0, sizeof mpnotetbl);
+    memset(mpwavenexttbl, 0, sizeof mpwavenexttbl);
+    memset(mppulselimittbl, 0, sizeof mppulselimittbl);
+    memset(mppulsespdtbl, 0, sizeof mppulsespdtbl);
+    memset(mppulsenexttbl, 0, sizeof mppulsenexttbl);
+    memset(mpfiltlimittbl, 0, sizeof mpfiltlimittbl);
+    memset(mpfiltspdtbl, 0, sizeof mpfiltspdtbl);
+    memset(mpfiltnexttbl, 0, sizeof mpfiltnexttbl);
+    memset(mppatterns, 0, sizeof mppatterns);
+    memset(mptracks, 0, sizeof mptracks);
+    memset(mpinsad, 0, sizeof mpinsad);
+    memset(mpinssr, 0, sizeof mpinssr);
+    memset(mpinswavepos, 0, sizeof mpinswavepos);
+    memset(mpinspulsepos, 0, sizeof mpinspulsepos);
+    memset(mpinsfiltpos, 0, sizeof mpinsfiltpos);
+    mpinssize = 0;
+    mpwavesize = 0;
+    mppulsesize = 0;
+    mpfiltsize = 0;
 }
 
 void convertsong(void)
 {
     int e,c,f;
-    unsigned char lastfiltparam = 0;
-    unsigned char lastcutoff = 0;
-    unsigned char inswavepos[256];
-    unsigned char insvibdelay[256];
-    unsigned char insvibparam[256];
-    unsigned char insntwavepos[256];
-    unsigned char insntlegatopos[256];
-    unsigned char insntpulsepos[256];
-    unsigned char insntfirstwavepos[256];
-    unsigned char insntlastwavepos[256];
-    unsigned char vibdelay[256];
-    unsigned char vibparam[256];
-    unsigned char vibntwavepos[256];
-    unsigned char slidentwavepos[256];
-    unsigned char waveposmap[256];
-    unsigned char pulseposmap[256];
-    unsigned char filtposmap[256];
-    unsigned char instrmap[256];
-    unsigned char legatoinstrmap[256];
-    unsigned char slidemap[512];
-    unsigned char vibmap[256];
-    int inswavevibs = 0;
-    int vibratos = 0;
+
+    memset(instrmap, 0, sizeof instrmap);
+    memset(instrpulseused, 0, sizeof instrpulseused);
+    memset(instrfirstwavepos, 0, sizeof instrfirstwavepos);
+    memset(instrlastwavepos, 0, sizeof instrlastwavepos);
+    memset(legatoinstrmap, 0, sizeof legatoinstrmap);
+    memset(slidemap, 0, sizeof slidemap);
+    memset(vibratomap, 0, sizeof vibratomap);
+    memset(waveposmap, 0, sizeof waveposmap);
+    memset(pulseposmap, 0, sizeof pulseposmap);
+    memset(filtposmap, 0, sizeof filtposmap);
 
     if (highestusedsong > 15)
     {
@@ -577,7 +580,7 @@ void convertsong(void)
             int trans = 0;
             int lasttrans = -1; // Make sure transpose resets on song loop, even if GT2 song doesn't include it
 
-            ntsongstart[e][c] = dest;
+            mpsongstart[e][c] = dest;
 
             while (1)
             {
@@ -601,49 +604,112 @@ void convertsong(void)
 
                 if (trans + pattbasetrans[patt] != lasttrans)
                 {
-                    nttracks[e][dest++] = ((trans + pattbasetrans[patt]) & 0x7f) | 0x80;
+                    mptracks[e][dest++] = ((trans + pattbasetrans[patt]) & 0x7f) | 0x80;
                     lasttrans = trans + pattbasetrans[patt];
                 }
 
                 while (rep--)
                 {
-                    nttracks[e][dest++] = patt + 1;
+                    mptracks[e][dest++] = patt + 1;
                 }
                 sp++;
             }
             sp++;
-            nttracks[e][dest++] = 0;
-            nttracks[e][dest++] = positionmap[songorder[e][c][sp]];
+            mptracks[e][dest++] = 0;
+            mptracks[e][dest++] = positionmap[songorder[e][c][sp]];
         }
         if (dest > 255)
         {
             printf("Song %d's trackdata does not fit in 255 bytes\n", e+1);
             exit(1);
         }
-        ntsongtotallen[e] = dest;
+        mpsongtotallen[e] = dest;
     }
 
-    // Convert instruments
-    memset(instrmap, 0, sizeof instrmap);
-    memset(legatoinstrmap, 0, sizeof legatoinstrmap);
-    memset(waveposmap, 0, sizeof waveposmap);
-    memset(pulseposmap, 0, sizeof pulseposmap);
-    memset(filtposmap, 0, sizeof filtposmap);
-    memset(slidemap, 0, sizeof slidemap);
-    memset(vibmap, 0, sizeof vibmap);
+    printf("Converting wavetable\n");
+
+    {
+        int sp = 0;
+
+        while (sp < 256 && mpwavesize < 255)
+        {
+            unsigned char wave = ltable[WTBL][sp];
+            unsigned char note = rtable[WTBL][sp];
+
+            if (sp > 0 && wave == 0x00 && ltable[WTBL][sp-1] == 0xff)
+                break;
+
+            waveposmap[sp+1] = mpwavesize + 1;
+            sp++;
+
+            if (wave < 0xf0 && note == 0x80)
+                printf("Warning: 'keep frequency unchanged' in wavetable is unsupported\n");
+            if (wave < 0xf0 && note >= 0x81 && note < 0x8c)
+            {
+                printf("Wavetable has octave 0, can not be converted correctly\n");
+                exit(1);
+            }
+            if (wave >= 0xf0 && wave < 0xff)
+                printf("Warning: wavetable commands are unsupported\n");
+
+            if (wave == 0xff)
+            {
+                waveposmap[sp] = mpwavesize;
+                continue;
+            }
+            else if (wave >= 0x10 && wave <= 0x8f)
+            {
+                mpwavetbl[mpwavesize] = wave;
+                mpnotetbl[mpwavesize] = note < 0x80 ? note : note-11;
+                mpwavenexttbl[mpwavesize] = mpwavesize+1+1;
+                mpwavesize++;
+            }
+            else if (wave >= 0xe1 && wave <= 0xef)
+            {
+                mpwavetbl[mpwavesize] = wave - 0xe0;
+                mpnotetbl[mpwavesize] = note < 0x80 ? note : note-11;
+                mpwavenexttbl[mpwavesize] = mpwavesize+1+1;
+                mpwavesize++;
+            }
+            else if (wave < 0x10)
+            {
+                mpwavetbl[mpwavesize] = 0xff - wave;
+                mpnotetbl[mpwavesize] = note < 0x80 ? note : note-11;
+                mpwavenexttbl[mpwavesize] = mpwavesize+1+1;
+                mpwavesize++;
+            }
+        }
+
+        // Fix jumps
+        sp = 0;
+        while (sp < 256)
+        {
+            unsigned char wave = ltable[WTBL][sp];
+            unsigned char note = rtable[WTBL][sp];
+
+            if (sp > 0 && wave == 0x00 && ltable[WTBL][sp-1] == 0xff)
+                break;
+            if (wave == 0xff)
+            {
+                mpwavenexttbl[waveposmap[sp+1]-1] = note ? waveposmap[note] : 0;
+            }
+            ++sp;
+        }
+    }
+
+    printf("Converting pulsetable\n");
 
     // Create the "stop pulse" optimization step
-    ntpulselimittbl[ntpulsesize] = 0;
-    ntpulsespdtbl[ntpulsesize] = 0;
-    ntpulsenexttbl[ntpulsesize] = 0;
-    ntpulsesize++;
+    mppulselimittbl[mppulsesize] = 0;
+    mppulsespdtbl[mppulsesize] = 0;
+    mppulsenexttbl[mppulsesize] = 0;
+    mppulsesize++;
 
-    // Convert the whole pulsetable first
     {
         int sp = 0;
         int pulsevalue = 0;
 
-        while (sp < 256 && ntpulsesize < 128)
+        while (sp < 256 && mppulsesize < 127)
         {
             unsigned char time = ltable[PTBL][sp];
             unsigned char spd = rtable[PTBL][sp];
@@ -651,7 +717,7 @@ void convertsong(void)
             if (sp > 0 && time == 0x00 && ltable[PTBL][sp-1] == 0xff)
                 break;
 
-            pulseposmap[sp+1] = (ntpulsesize + 1) | (time & 0x80);
+            pulseposmap[sp+1] = (mppulsesize + 1) | (time & 0x80);
             sp++;
 
             if (time != 0xff && spd & 0xf)
@@ -661,18 +727,18 @@ void convertsong(void)
 
             if (time == 0xff)
             {
-                pulseposmap[sp] = ntpulsesize;
+                pulseposmap[sp] = mppulsesize;
                 continue;
             }
             else if (time & 0x80)
             {
-                ntpulselimittbl[ntpulsesize] = (time & 0xf) | (spd & 0xf0);
-                ntpulsespdtbl[ntpulsesize] = 0;
-                ntpulsenexttbl[ntpulsesize] = ntpulsesize+1+1;
-                if (ntpulsesize > 1 && ntpulsenexttbl[ntpulsesize-1] == ntpulsesize+1)
-                    ntpulsenexttbl[ntpulsesize-1] |= 0x80;
+                mppulselimittbl[mppulsesize] = (time & 0xf) | (spd & 0xf0);
+                mppulsespdtbl[mppulsesize] = 0;
+                mppulsenexttbl[mppulsesize] = mppulsesize+1+1;
+                if (mppulsesize > 1 && mppulsenexttbl[mppulsesize-1] == mppulsesize+1)
+                    mppulsenexttbl[mppulsesize-1] |= 0x80;
                 pulsevalue = ((time & 0xf) << 8) | spd;
-                ++ntpulsesize;
+                ++mppulsesize;
             }
             else
             {
@@ -680,16 +746,16 @@ void convertsong(void)
                     pulsevalue += time*spd;
                 else
                     pulsevalue += time*((int)spd-0x100);
-                ntpulselimittbl[ntpulsesize] = (pulsevalue >> 8) | (pulsevalue & 0xf0);
+                mppulselimittbl[mppulsesize] = (pulsevalue >> 8) | (pulsevalue & 0xf0);
                 if (spd < 0x80)
-                    ntpulsespdtbl[ntpulsesize] = spd & 0xf0;
+                    mppulsespdtbl[mppulsesize] = spd & 0xf0;
                 else
-                    ntpulsespdtbl[ntpulsesize] = (spd & 0xf0) - 1;
-                ntpulsenexttbl[ntpulsesize] = ntpulsesize+1+1;
-                ++ntpulsesize;
+                    mppulsespdtbl[mppulsesize] = (spd & 0xf0) - 1;
+                mppulsenexttbl[mppulsesize] = mppulsesize+1+1;
+                ++mppulsesize;
             }
         }
-        
+
         // Fix jumps
         sp = 0;
         while (sp < 256)
@@ -701,18 +767,19 @@ void convertsong(void)
                 break;
             if (time == 0xff)
             {
-                ntpulsenexttbl[(pulseposmap[sp+1]&0x7f)-1] = spd ? pulseposmap[spd] : 0;
+                mppulsenexttbl[(pulseposmap[sp+1]&0x7f)-1] = spd ? pulseposmap[spd] : 0;
             }
             ++sp;
         }
     }
     
-    // Convert the whole filtertable
+    printf("Converting filtertable\n");
+
     {
         int sp = 0;
         unsigned char cutoffvalue = 0;
 
-        while (sp < 256 && ntfiltsize < 128)
+        while (sp < 256 && mpfiltsize < 127)
         {
             unsigned char time = ltable[FTBL][sp];
             unsigned char spd = rtable[FTBL][sp];
@@ -720,30 +787,30 @@ void convertsong(void)
             if (sp > 0 && time == 0x00 && ltable[FTBL][sp-1] == 0xff)
                 break;
 
-            filtposmap[sp+1] = (ntfiltsize + 1) | (time & 0x80);
+            filtposmap[sp+1] = (mpfiltsize + 1) | (time & 0x80);
             sp++;
 
             if (time == 0xff)
             {
-                filtposmap[sp] = ntfiltsize;
+                filtposmap[sp] = mpfiltsize;
                 continue;
             }
             else if (time & 0x80)
             {
                 if (time & 0x40)
                     printf("Warning: highpass filter not supported\n");
-                ntfiltspdtbl[ntfiltsize] = (time & 0x30) | (spd & 0xcf);
-                ntfiltnexttbl[ntfiltsize] = ntfiltsize+1+1;
+                mpfiltspdtbl[mpfiltsize] = (time & 0x30) | (spd & 0xcf);
+                mpfiltnexttbl[mpfiltsize] = mpfiltsize+1+1;
                 if (ltable[FTBL][sp] != 0)
                     printf("Warning: filter init-step not followed by set cutoff-step\n");
-                if (ntfiltsize > 1 && ntfiltnexttbl[ntfiltsize-1] == ntfiltsize+1)
-                    ntfiltnexttbl[ntfiltsize-1] |= 0x80;
-                ++ntfiltsize;
+                if (mpfiltsize > 1 && mpfiltnexttbl[mpfiltsize-1] == mpfiltsize+1)
+                    mpfiltnexttbl[mpfiltsize-1] |= 0x80;
+                ++mpfiltsize;
             }
-            else if (time == 0 && ntfiltsize > 0)
+            else if (time == 0 && mpfiltsize > 0)
             {
                 // Fill in the initial cutoff value of the init step above
-                ntfiltlimittbl[ntfiltsize-1] = spd;
+                mpfiltlimittbl[mpfiltsize-1] = spd;
                 cutoffvalue = spd;
             }
             else
@@ -752,10 +819,10 @@ void convertsong(void)
                     cutoffvalue += time*spd;
                 else
                     cutoffvalue += time*((int)spd-0x100);
-                ntfiltlimittbl[ntfiltsize] = cutoffvalue;
-                ntfiltspdtbl[ntfiltsize] = spd;
-                ntfiltnexttbl[ntfiltsize] = ntfiltsize+1+1;
-                ++ntfiltsize;
+                mpfiltlimittbl[mpfiltsize] = cutoffvalue;
+                mpfiltspdtbl[mpfiltsize] = spd;
+                mpfiltnexttbl[mpfiltsize] = mpfiltsize+1+1;
+                ++mpfiltsize;
             }
         }
 
@@ -770,158 +837,99 @@ void convertsong(void)
                 break;
             if (time == 0xff)
             {
-                printf("Fix filterjump at %d (sourcepos %d) to %d\n", (filtposmap[sp]&0x7f), sp, spd ? filtposmap[spd] : 0);
-                ntfiltnexttbl[(filtposmap[sp+1]&0x7f)-1] = spd ? filtposmap[spd] : 0;
+                mpfiltnexttbl[(filtposmap[sp+1]&0x7f)-1] = spd ? filtposmap[spd] : 0;
             }
             ++sp;
         }
     }
 
+    printf("Converting instruments\n");
+
     for (e = 1; e <= highestusedinstr; e++)
     {
-        int existingwavepos = 0;
-        int f;
         int pulseused = 0;
-
+        
         // If instrument has no wavetable pointer, assume it is not used
         if (!instr[e].ptr[WTBL])
             continue;
-        ntcmdad[ntcmdsize] = instr[e].ad;
-        ntcmdsr[ntcmdsize] = instr[e].sr;
+        mpinsad[mpinssize] = instr[e].ad;
+        mpinssr[mpinssize] = instr[e].sr;
+        mpinswavepos[mpinssize] = instrfirstwavepos[e] = waveposmap[instr[e].ptr[WTBL]];
 
-        for (f = 0; f < inswavevibs; ++f)
+        // Find out last wavestep for legato, also find out if pulse is used
         {
-            if (inswavepos[f] == instr[e].ptr[WTBL] && instr[e].ptr[STBL] == insvibparam[f] && instr[e].vibdelay == insvibdelay[f])
+            int wp = instrfirstwavepos[e];
+            while (wp < 255)
             {
-                existingwavepos = insntwavepos[f];
-                insntfirstwavepos[e] = insntwavepos[f];
-                insntlastwavepos[e] = insntlegatopos[f];
-                break;
-            }
-        }
-        if (existingwavepos == 0)
-        {
-            int sp = instr[e].ptr[WTBL]-1;
-            int waveendpos = 0;
-            int legatoendpos = 0;
-            existingwavepos = ntwavesize + 1;
-
-            while (sp < 256 && ntwavesize < 256)
-            {
-                unsigned char wave = ltable[WTBL][sp];
-                unsigned char note = rtable[WTBL][sp];
-                waveposmap[sp+1] = ntwavesize + 1;
-                sp++;
-
-                if (wave < 0xf0 && note == 0x80)
-                    printf("Warning: 'keep frequency unchanged' in wavetable is unsupported\n");
-                if (wave < 0xf0 && note >= 0x81 && note < 0x8c)
-                {
-                    printf("Wavetable has octave 0, can not be converted correctly\n");
-                    exit(1);
-                }
-                if (wave >= 0xf0 && wave < 0xff)
-                    printf("Warning: wavetable commands are unsupported\n");
-
-                if (wave == 0xff)
-                {
-                    ntnexttbl[ntwavesize-1] = waveposmap[note];
+                if (mpwavetbl[wp-1] & 0x40)
+                    pulseused = 1;
+                if (mpwavenexttbl[wp-1] != wp+1)
                     break;
-                }
-                else if (wave >= 0x10 && wave <= 0x8f)
-                {
-                    ntwavetbl[ntwavesize] = wave;
-                    ntnotetbl[ntwavesize] = note < 0x80 ? note : note-11;
-                    ntnexttbl[ntwavesize] = ntwavesize+1+1;
-                    legatoendpos = ntwavesize + 1;
-                    if (wave & 0x40)
-                        pulseused = 1;
-                    ntwavesize++;
-                }
-                else if (wave >= 0xe1 && wave <= 0xef)
-                {
-                    ntwavetbl[ntwavesize] = wave - 0xe0;
-                    ntnotetbl[ntwavesize] = note < 0x80 ? note : note-11;
-                    ntnexttbl[ntwavesize] = ntwavesize+1+1;
-                    legatoendpos = ntwavesize + 1;
-                    ntwavesize++;
-                }
-                else if (wave < 0x10)
-                {
-                    ntwavetbl[ntwavesize] = 0xff - wave;
-                    ntnotetbl[ntwavesize] = note < 0x80 ? note : note-11;
-                    ntnexttbl[ntwavesize] = ntwavesize+1+1;
-                    ntwavesize++;
-                }
+                ++wp;
             }
-
-            inswavepos[inswavevibs] = instr[e].ptr[WTBL];
-            insvibdelay[inswavevibs] = instr[e].vibdelay;
-            insvibparam[inswavevibs] = instr[e].ptr[STBL];
-            insntwavepos[inswavevibs] = existingwavepos;
-            insntlegatopos[inswavevibs] = legatoendpos;
-            insntfirstwavepos[e] = existingwavepos;
-            insntlastwavepos[e] = legatoendpos;
-            inswavevibs++;
-
-            waveendpos = ntwavesize;
-
-            if (instr[e].vibdelay > 0 && ntwavesize <= 254)
-            {
-                int existingvibpos = 0;
-                for (f = 0; f < vibratos; ++f)
-                {
-                    if (vibdelay[f] == instr[e].vibdelay && vibparam[f] == instr[e].ptr[STBL])
-                    {
-                        existingvibpos = vibntwavepos[f];
-                        break;
-                    }
-                }
-
-                if (existingvibpos == 0)
-                {
-                    int srcpos = instr[e].ptr[STBL]-1;
-                    existingvibpos = ntwavesize+1;
-                    if (instr[e].vibdelay > 1 && instr[e].vibdelay < 0x70)
-                    {
-                        ntwavetbl[ntwavesize] = 0x100 - instr[e].vibdelay;
-                        ntnotetbl[ntwavesize] = 0;
-                        ntnexttbl[ntwavesize] = ntwavesize+1+1;
-                        ntwavesize++;
-                    }
-                    vibmap[instr[e].ptr[STBL]] = ntwavesize+1;
-                    ntwavetbl[ntwavesize] = 0;
-                    ntnotetbl[ntwavesize] = 0xff - ltable[STBL][srcpos];
-                    ntnexttbl[ntwavesize] = rtable[STBL][srcpos];
-                    ntwavesize++;
-                    vibdelay[vibratos] = instr[e].vibdelay;
-                    vibparam[vibratos] = instr[e].ptr[STBL];
-                    vibntwavepos[vibratos] = existingvibpos;
-                    vibratos++;
-                }
-                ntnexttbl[waveendpos-1] = existingvibpos;
-            }
+            instrlastwavepos[e] = wp;
         }
-
-        ntcmdwavepos[ntcmdsize] = existingwavepos;
 
         if (!instr[e].ptr[PTBL])
         {
             if (pulseused)
-                ntcmdpulsepos[ntcmdsize] = 0; // Keep existing pulse going
+                mpinspulsepos[mpinssize] = 0; // Keep existing pulse going
             else
-                ntcmdpulsepos[ntcmdsize] = 1; // Stop pulse-step, for saving rastertime for triangle/sawtooth/noise only instruments
+                mpinspulsepos[mpinssize] = 1; // Stop pulse-step, for saving rastertime for triangle/sawtooth/noise only instruments
         }
         else
-            ntcmdpulsepos[ntcmdsize] = pulseposmap[instr[e].ptr[PTBL]];
+            mpinspulsepos[mpinssize] = pulseposmap[instr[e].ptr[PTBL]];
 
         if (!instr[e].ptr[FTBL])
-            ntcmdfiltpos[ntcmdsize] = 0;
+            mpinsfiltpos[mpinssize] = 0;
         else
-            ntcmdfiltpos[ntcmdsize] = filtposmap[instr[e].ptr[FTBL]];
+            mpinsfiltpos[mpinssize] = filtposmap[instr[e].ptr[FTBL]];
 
-        instrmap[e] = ntcmdsize+1;
-        ntcmdsize++;
+        instrmap[e] = mpinssize+1;
+        mpinssize++;
+    }
+
+    for (e = 1; e <= highestusedinstr; e++)
+    {
+        // Add instrument vibratos
+        if (instr[e].ptr[STBL] && instr[e].ptr[WTBL] && instr[e].vibdelay > 0)
+        {
+            int i = instrmap[e];
+            int newvibwavepos = 0;
+            int needcopy = 0;
+            int waveends = 0;
+            int wavejumppos = 0;
+            int f;
+
+            for (f = 1; f <= highestusedinstr; f++)
+            {
+                if (f != e && instr[f].ptr[WTBL] == instr[e].ptr[WTBL])
+                {
+                    needcopy = 1;
+                    break;
+                }
+            }
+            
+            if (!needcopy)
+                mpwavenexttbl[instrlastwavepos[e]-1] = getvibrato(instr[e].vibdelay, instr[e].ptr[STBL]);
+            else
+            {
+                int jumppos = 0;
+                int copystart = mpwavesize+1;
+                mpinswavepos[instrmap[e]-1] = copystart;
+                for (f = instrfirstwavepos[e]; f <= instrlastwavepos[e]; ++f)
+                {
+                    mpwavetbl[mpwavesize] = mpwavetbl[f-1];
+                    mpnotetbl[mpwavesize] = mpnotetbl[f-1];
+                    mpwavenexttbl[mpwavesize] = mpwavesize+1+1;
+                    ++mpwavesize;
+                }
+                instrfirstwavepos[e] = copystart;
+                instrlastwavepos[e] = mpwavesize;
+                jumppos = mpwavesize-1;
+                mpwavenexttbl[jumppos] = getvibrato(instr[e].vibdelay, instr[e].ptr[STBL]);
+            }
+        }
     }
 
     // Convert patterns
@@ -952,11 +960,11 @@ void convertsong(void)
             int gtcmddata = pattern[e][c*4+3];
             if (note == ENDPATT)
             {
-                notecolumn[d] = NT_ENDPATT;
+                notecolumn[d] = MP_ENDPATT;
                 break;
             }
             int instr = pattinstr[e][c];
-            int ntinstr = instrmap[instr];
+            int mpinstr = instrmap[instr];
             int dur = patttempo[e][c];
             int waveptr = 0;
 
@@ -983,19 +991,7 @@ void convertsong(void)
                 {
                     if (gtcmddata == 0 && note >= FIRSTNOTE+12 && note <= LASTNOTE) // Legato note start
                     {
-                        if (legatoinstrmap[instr])
-                            ntinstr = legatoinstrmap[instr] + 0x80;
-                        else
-                        {
-                            legatoinstrmap[instr] = ntcmdsize+1;
-                            ntcmdad[ntcmdsize] = 0;
-                            ntcmdsr[ntcmdsize] = 0;
-                            ntcmdwavepos[ntcmdsize] = insntlastwavepos[instr];
-                            ntcmdpulsepos[ntcmdsize] = 0;
-                            ntcmdfiltpos[ntcmdsize] = 0;
-                            ntcmdsize++;
-                            ntinstr = legatoinstrmap[instr] + 0x80;
-                        }
+                        mpinstr = getlegatoinstr(instr);
                     }
                     else if (gtcmddata > 0 && note >= FIRSTNOTE+12 && note <= LASTNOTE)
                     {
@@ -1008,28 +1004,12 @@ void convertsong(void)
 
                         if (targetfreq > freq)
                         {
-                            if (gtcmddata != 0 && slidemap[gtcmddata] == 0 && ntwavesize < 256)
-                            {
-                                ntwavetbl[ntwavesize] = 0x90;
-                                ntnexttbl[ntwavesize] = (speed-1) >> 8;
-                                ntnotetbl[ntwavesize] = (speed-1) & 0xff;
-                                slidemap[gtcmddata] = ntwavesize+1;
-                                ntwavesize++;
-                            }
-                            waveptr = slidemap[gtcmddata];
+                            waveptr = getslide(speed);
                         }
                         else
                         {
                             speed = -speed;
-                            if (gtcmddata != 0 && slidemap[gtcmddata+0x100] == 0 && ntwavesize < 256)
-                            {
-                                ntwavetbl[ntwavesize] = 0x90;
-                                ntnexttbl[ntwavesize] = (speed-1) >> 8;
-                                ntnotetbl[ntwavesize] = (speed-1) & 0xff;
-                                slidemap[gtcmddata+0x100] = ntwavesize+1;
-                                ntwavesize++;
-                           }
-                            waveptr = slidemap[gtcmddata+0x100];
+                            waveptr = getslide(speed);
                         }
                         tptargetnote = note;
                         note = REST; // The actual toneportamento target note is just discarded, as there is no "stop at note" functionality in the player
@@ -1042,15 +1022,7 @@ void convertsong(void)
                     if (gtcmddata != 0)
                         speed = (ltable[STBL][gtcmddata-1] << 8) | rtable[STBL][gtcmddata-1];
 
-                    if (gtcmddata != 0 && slidemap[gtcmddata] == 0 && ntwavesize < 256)
-                    {
-                        ntwavetbl[ntwavesize] = 0x90;
-                        ntnexttbl[ntwavesize] = (speed-1) >> 8;
-                        ntnotetbl[ntwavesize] = (speed-1) & 0xff;
-                        slidemap[gtcmddata] = ntwavesize+1;
-                        ntwavesize++;
-                    }
-                    waveptr = slidemap[gtcmddata];
+                    waveptr = getslide(speed);
                     freq += (dur-3) * speed; // Assume 3 steps get lost for toneportamento purposes
                 }
                 else if (gtcmd == 0x2)
@@ -1059,29 +1031,12 @@ void convertsong(void)
                     if (gtcmddata != 0)
                         speed = -((ltable[STBL][gtcmddata-1] << 8) | rtable[STBL][gtcmddata-1]);
 
-                    if (gtcmddata != 0 && slidemap[gtcmddata+0x100] == 0 && ntwavesize < 256)
-                    {
-                        ntwavetbl[ntwavesize] = 0x90;
-                        ntnexttbl[ntwavesize] = (speed-1) >> 8;
-                        ntnotetbl[ntwavesize] = (speed-1) & 0xff;
-                        slidemap[gtcmddata+0x100] = ntwavesize+1;
-                        ntwavesize++;
-                    }
-                    waveptr = slidemap[gtcmddata+0x100];
+                    waveptr = getslide(speed);
                     freq += (dur-3) * speed; // Assume 3 steps get lost for toneportamento purposes
                 }
                 else if (gtcmd == 0x4)
                 {
-                    if (gtcmddata != 0 && vibmap[gtcmddata] == 0 && ntwavesize < 256)
-                    {
-                        int srcpos = gtcmddata-1;
-                        ntwavetbl[ntwavesize] = 0;
-                        ntnotetbl[ntwavesize] = 0xff - ltable[STBL][srcpos];
-                        ntnexttbl[ntwavesize] = rtable[STBL][srcpos];
-                        vibmap[gtcmddata] = ntwavesize+1;
-                        ntwavesize++;
-                    }
-                    waveptr = vibmap[gtcmddata];
+                    waveptr = getvibrato(0, gtcmddata);
                 }
                 else
                 {
@@ -1096,48 +1051,36 @@ void convertsong(void)
             {
                 if (tpstepsleft < dur)
                 {
-                    if (legatoinstrmap[lastnoteins])
-                        ntinstr = legatoinstrmap[lastnoteins] + 0x80;
-                    else
-                    {
-                        legatoinstrmap[lastnoteins] = ntcmdsize+1;
-                        ntcmdad[ntcmdsize] = 0;
-                        ntcmdsr[ntcmdsize] = 0;
-                        ntcmdwavepos[ntcmdsize] = insntlastwavepos[lastnoteins];
-                        ntcmdpulsepos[ntcmdsize] = 0;
-                        ntcmdfiltpos[ntcmdsize] = 0;
-                        ntcmdsize++;
-                        ntinstr = legatoinstrmap[instr] + 0x80;
-                    }
+                    mpinstr = getlegatoinstr(instr);
 
                     if (tpstepsleft == 0)
                     {
-                        notecolumn[d] = (tptargetnote-pattbasetrans[e]-FIRSTNOTE-12)*2+NT_FIRSTNOTE;
-                        cmdcolumn[d] = ntinstr;
+                        notecolumn[d] = (tptargetnote-pattbasetrans[e]-FIRSTNOTE-12)*2+MP_FIRSTNOTE;
+                        cmdcolumn[d] = mpinstr;
                     }
                     else
                     {
                         if (waveptr && waveptr != lastwaveptr)
                         {
-                            notecolumn[d] = NT_WAVEPTR;
+                            notecolumn[d] = MP_WAVEPTR;
                             cmdcolumn[d] = waveptr;
                             durcolumn[d] = tpstepsleft;
                         }
                         else
                         {
-                            notecolumn[d] = NT_REST;
+                            notecolumn[d] = MP_REST;
                             cmdcolumn[d] = 0;
                             durcolumn[d] = tpstepsleft;
                         }
                         ++d;
-                        notecolumn[d] = (tptargetnote-pattbasetrans[e]-FIRSTNOTE-12)*2+NT_FIRSTNOTE;
-                        cmdcolumn[d] = ntinstr;
+                        notecolumn[d] = (tptargetnote-pattbasetrans[e]-FIRSTNOTE-12)*2+MP_FIRSTNOTE;
+                        cmdcolumn[d] = mpinstr;
                         durcolumn[d] = dur-tpstepsleft;
                     }
                     ++d;
                     tptargetnote = 0;
                     lastwaveptr = 0; // TP ended, consider next waveptr command individually again
-                    lastnotentins = ntinstr;
+                    lastnotentins = mpinstr;
                     continue;
                 }
                 else
@@ -1150,22 +1093,22 @@ void convertsong(void)
             {
                 lastwaveptr = 0; // If triggering a note, forget the last waveptr
 
-                notecolumn[d] = (note-pattbasetrans[e]-FIRSTNOTE-12)*2+NT_FIRSTNOTE;
-                if (ntinstr != lastnotentins)
+                notecolumn[d] = (note-pattbasetrans[e]-FIRSTNOTE-12)*2+MP_FIRSTNOTE;
+                if (mpinstr != lastnotentins)
                 {
-                    cmdcolumn[d] = ntinstr;
+                    cmdcolumn[d] = mpinstr;
                     lastnoteins = instr;
-                    lastnotentins = ntinstr;
+                    lastnotentins = mpinstr;
                 }
                 // If waveptr in combination with note, must split step
                 if (waveptr && waveptr != lastwaveptr)
                 {
-                    int requireddur = insntlastwavepos[instr]-insntfirstwavepos[instr] + 3;
+                    int requireddur = instrlastwavepos[instr]-instrfirstwavepos[instr] + 3;
                     if (dur > requireddur)
                     {
                         durcolumn[d] = requireddur;
                         ++d;
-                        notecolumn[d] = NT_WAVEPTR;
+                        notecolumn[d] = MP_WAVEPTR;
                         cmdcolumn[d] = waveptr;
                         durcolumn[d] = dur-requireddur;
                     }
@@ -1173,10 +1116,10 @@ void convertsong(void)
             }
             else
             {
-                notecolumn[d] = note == KEYOFF ? NT_KEYOFF : NT_REST;
+                notecolumn[d] = note == KEYOFF ? MP_KEYOFF : MP_REST;
                 if (waveptr && waveptr != lastwaveptr)
                 {
-                    notecolumn[d] = NT_WAVEPTR;
+                    notecolumn[d] = MP_WAVEPTR;
                     cmdcolumn[d] = waveptr;
                 }
             }
@@ -1189,20 +1132,20 @@ void convertsong(void)
         {
             int merge = 0;
             
-            if (notecolumn[c] == NT_ENDPATT || notecolumn[c+1] == NT_ENDPATT)
+            if (notecolumn[c] == MP_ENDPATT || notecolumn[c+1] == MP_ENDPATT)
                 break;
 
             if ((durcolumn[c] + durcolumn[c+1]) <= maxdur && cmdcolumn[c+1] == 0)
             {
-                if (notecolumn[c] == NT_KEYOFF && notecolumn[c+1] == NT_KEYOFF)
+                if (notecolumn[c] == MP_KEYOFF && notecolumn[c+1] == MP_KEYOFF)
                     merge = 1;
-                else if (notecolumn[c] == NT_REST && notecolumn[c+1] == NT_REST)
+                else if (notecolumn[c] == MP_REST && notecolumn[c+1] == MP_REST)
                     merge = 1;
-                else if (notecolumn[c] == NT_KEYOFF && notecolumn[c+1] == NT_REST)
+                else if (notecolumn[c] == MP_KEYOFF && notecolumn[c+1] == MP_REST)
                     merge = 1;
-                else if (notecolumn[c] == NT_WAVEPTR && notecolumn[c+1] == NT_REST)
+                else if (notecolumn[c] == MP_WAVEPTR && notecolumn[c+1] == MP_REST)
                     merge = 1;
-                else if (notecolumn[c] >= NT_FIRSTNOTE && notecolumn[c] <= NT_LASTNOTE && notecolumn[c+1] == NT_REST)
+                else if (notecolumn[c] >= MP_FIRSTNOTE && notecolumn[c] <= MP_LASTNOTE && notecolumn[c+1] == MP_REST)
                     merge = 1;
             }
 
@@ -1227,20 +1170,20 @@ void convertsong(void)
             int sum = durcolumn[c] + durcolumn[c+1];
             int average = 0;
 
-            if (notecolumn[c] == NT_ENDPATT || notecolumn[c+1] == NT_ENDPATT)
+            if (notecolumn[c] == MP_ENDPATT || notecolumn[c+1] == MP_ENDPATT)
                 break;
 
-            if (!(sum & 1) && durcolumn[c] != durcolumn[c+1] && cmdcolumn[c+1] == 0 && (notecolumn[c+2] == NT_ENDPATT || durcolumn[c+2] != durcolumn[c+1]))
+            if (!(sum & 1) && durcolumn[c] != durcolumn[c+1] && cmdcolumn[c+1] == 0 && (notecolumn[c+2] == MP_ENDPATT || durcolumn[c+2] != durcolumn[c+1]))
             {
-                if (notecolumn[c] == NT_KEYOFF && notecolumn[c+1] == NT_KEYOFF)
+                if (notecolumn[c] == MP_KEYOFF && notecolumn[c+1] == MP_KEYOFF)
                     average = 1;
-                else if (notecolumn[c] == NT_REST && notecolumn[c+1] == NT_REST)
+                else if (notecolumn[c] == MP_REST && notecolumn[c+1] == MP_REST)
                     average = 1;
-                else if (notecolumn[c] == NT_KEYOFF && notecolumn[c+1] == NT_REST)
+                else if (notecolumn[c] == MP_KEYOFF && notecolumn[c+1] == MP_REST)
                     average = 1;
-                else if (notecolumn[c] == NT_WAVEPTR && notecolumn[c+1] == NT_REST)
+                else if (notecolumn[c] == MP_WAVEPTR && notecolumn[c+1] == MP_REST)
                     average = 1;
-                else if (notecolumn[c] >= NT_FIRSTNOTE && notecolumn[c] <= NT_LASTNOTE && notecolumn[c+1] == NT_REST)
+                else if (notecolumn[c] >= MP_FIRSTNOTE && notecolumn[c] <= MP_LASTNOTE && notecolumn[c+1] == MP_REST)
                     average = 1;
             }
             if (average == 1)
@@ -1253,10 +1196,10 @@ void convertsong(void)
         // Remove 1-2-1 duration changes if possible
         for (c = 1; c < MAX_PATTROWS+1; c++)
         {
-            if (notecolumn[c] == NT_ENDPATT || notecolumn[c+1] == NT_ENDPATT)
+            if (notecolumn[c] == MP_ENDPATT || notecolumn[c+1] == MP_ENDPATT)
                 break;
 
-            if (durcolumn[c+1] == durcolumn[c-1] && durcolumn[c] == 2*durcolumn[c-1] && notecolumn[c] >= NT_FIRSTNOTE && notecolumn[c] <= NT_LASTNOTE)
+            if (durcolumn[c+1] == durcolumn[c-1] && durcolumn[c] == 2*durcolumn[c-1] && notecolumn[c] >= MP_FIRSTNOTE && notecolumn[c] <= MP_LASTNOTE)
             {
                 int d;
                 for (d = MAX_PATTROWS - 1; d > c; d--)
@@ -1265,7 +1208,7 @@ void convertsong(void)
                     cmdcolumn[d+1] = cmdcolumn[d];
                     durcolumn[d+1]= durcolumn[d];
                 }
-                notecolumn[c+1] = NT_REST;
+                notecolumn[c+1] = MP_REST;
                 cmdcolumn[c+1] = 0;
                 durcolumn[c] = durcolumn[c+1] = durcolumn[c-1];
             }
@@ -1274,7 +1217,7 @@ void convertsong(void)
         // Fix if has too short durations
         for (c = 0; c < MAX_PATTROWS; c++)
         {
-            if (notecolumn[c] == NT_ENDPATT)
+            if (notecolumn[c] == MP_ENDPATT)
                 break;
             if (durcolumn[c] > 0 && durcolumn[c] < 3)
             {
@@ -1289,7 +1232,7 @@ void convertsong(void)
         // Clear unneeded durations
         for (c = 0; c < MAX_PATTROWS+1; c++)
         {
-            if (notecolumn[c] == NT_ENDPATT)
+            if (notecolumn[c] == MP_ENDPATT)
                 break;
             if (c && durcolumn[c] == lastdur)
                 durcolumn[c] = 0;
@@ -1300,44 +1243,103 @@ void convertsong(void)
         // Build the final patterndata
         for (c = 0; c < MAX_PATTROWS+1; c++)
         {
-            if (notecolumn[c] == NT_ENDPATT)
+            if (notecolumn[c] == MP_ENDPATT)
             {
-                ntpatterns[e][pattlen++] = NT_ENDPATT;
+                mppatterns[e][pattlen++] = MP_ENDPATT;
                 break;
             }
 
-            if (notecolumn[c] >= NT_FIRSTNOTE && notecolumn[c] <= NT_LASTNOTE)
+            if (notecolumn[c] >= MP_FIRSTNOTE && notecolumn[c] <= MP_LASTNOTE)
             {
                 if (cmdcolumn[c])
                 {
-                    ntpatterns[e][pattlen++] = notecolumn[c];
-                    ntpatterns[e][pattlen++] = cmdcolumn[c];
+                    mppatterns[e][pattlen++] = notecolumn[c];
+                    mppatterns[e][pattlen++] = cmdcolumn[c];
                 }
                 else
-                    ntpatterns[e][pattlen++] = notecolumn[c] + NT_NOCMD;
+                    mppatterns[e][pattlen++] = notecolumn[c] + MP_NOCMD;
             }
-            else if (notecolumn[c] == NT_WAVEPTR)
+            else if (notecolumn[c] == MP_WAVEPTR)
             {
-                ntpatterns[e][pattlen++] = notecolumn[c];
-                ntpatterns[e][pattlen++] = cmdcolumn[c];
+                mppatterns[e][pattlen++] = notecolumn[c];
+                mppatterns[e][pattlen++] = cmdcolumn[c];
             }
             else
             {
-                ntpatterns[e][pattlen++] = notecolumn[c];
+                mppatterns[e][pattlen++] = notecolumn[c];
             }
             if (durcolumn[c])
             {
-                ntpatterns[e][pattlen++] = 0x101 - durcolumn[c];
+                mppatterns[e][pattlen++] = 0x101 - durcolumn[c];
             }
         }
 
-        if (pattlen > MAX_NTPATTLEN)
+        if (pattlen > MAX_MPPATTLEN)
         {
             printf("Pattern %d does not fit in 256 bytes when compressed\n", e);
             exit(1);
         }
-        ntpattlen[e] = pattlen;
+        mppattlen[e] = pattlen;
     }
+}
+
+unsigned char getlegatoinstr(unsigned char instr)
+{
+    if (legatoinstrmap[instr])
+        return legatoinstrmap[instr];
+    
+    mpinsad[mpinssize] = 0;
+    mpinssr[mpinssize] = 0;
+    mpinswavepos[mpinssize] = instrlastwavepos[instr];
+    mpinspulsepos[mpinssize] = 0;
+    mpinsfiltpos[mpinssize] = 0;
+    legatoinstrmap[instr] = mpinssize+0x81;
+    ++mpinssize;
+
+    return legatoinstrmap[instr];
+}
+
+unsigned char getvibrato(unsigned char delay, unsigned char param)
+{
+    if (delay == 0)
+        delay = 1;
+
+    if (vibratomap[(delay<<8) + param])
+        return vibratomap[(delay<<8) + param];
+
+    vibratomap[(delay<<8) + param] = mpwavesize+1;
+
+    if (delay > 1 && mpwavesize < 254)
+    {
+        mpwavetbl[mpwavesize] = 0x100 - delay;
+        mpnotetbl[mpwavesize] = 0;
+        mpwavenexttbl[mpwavesize] = mpwavesize+1+1;
+        mpwavesize++;
+    }
+
+    if (mpwavesize < 255)
+    {
+        mpwavetbl[mpwavesize] = 0;
+        mpnotetbl[mpwavesize] = 0xff - ltable[STBL][param-1];
+        mpwavenexttbl[mpwavesize] = rtable[STBL][param-1];
+        mpwavesize++;
+    }
+
+    return vibratomap[(delay<<8) + param];
+}
+
+unsigned char getslide(unsigned short speed)
+{
+    if (slidemap[speed])
+        return slidemap[speed];
+
+    mpwavetbl[mpwavesize] = 0x90;
+    mpnotetbl[mpwavesize] = (speed-1) & 0xff;
+    mpwavenexttbl[mpwavesize] = (speed-1) >> 8;
+    slidemap[speed] = mpwavesize+1;
+    ++mpwavesize;
+
+    return slidemap[speed];
 }
 
 void getpattbasetrans(void)
@@ -1382,6 +1384,7 @@ void getpattbasetrans(void)
         pattbasetrans[e] = basetrans;
     }
 }
+
 void getpatttempos(void)
 {
     int e,c;
@@ -1521,7 +1524,7 @@ void getpatttempos(void)
     }
 }
 
-void saventsong(const char* songfilename)
+void savempsong(const char* songfilename)
 {
     int c;
 
@@ -1535,19 +1538,19 @@ void saventsong(const char* songfilename)
     fprintf(out, "musicHeader:\n");
     fprintf(out, "  dc.b %d\n", (highestusedsong+1)*5);
     fprintf(out, "  dc.b %d\n", highestusedpatt+1);
-    fprintf(out, "  dc.b %d\n", ntcmdsize);
-    fprintf(out, "  dc.b %d\n", ntwavesize);
-    fprintf(out, "  dc.b %d\n", ntpulsesize);
-    fprintf(out, "  dc.b %d\n", ntfiltsize);
+    fprintf(out, "  dc.b %d\n", mpinssize);
+    fprintf(out, "  dc.b %d\n", mpwavesize);
+    fprintf(out, "  dc.b %d\n", mppulsesize);
+    fprintf(out, "  dc.b %d\n", mpfiltsize);
     fprintf(out, "\n");
     
     fprintf(out, "songTbl:\n");
     for (c = 0; c <= highestusedsong; ++c)
     {
         fprintf(out, "  dc.w song%d-1\n", c);
-        fprintf(out, "  dc.b $%02x\n", ntsongstart[c][0]+1);
-        fprintf(out, "  dc.b $%02x\n", ntsongstart[c][1]+1);
-        fprintf(out, "  dc.b $%02x\n", ntsongstart[c][2]+1);
+        fprintf(out, "  dc.b $%02x\n", mpsongstart[c][0]+1);
+        fprintf(out, "  dc.b $%02x\n", mpsongstart[c][1]+1);
+        fprintf(out, "  dc.b $%02x\n", mpsongstart[c][2]+1);
     }
     fprintf(out, "\n");
 
@@ -1560,33 +1563,33 @@ void saventsong(const char* songfilename)
         fprintf(out, "  dc.b >patt%d\n", c);
     fprintf(out, "\n");
 
-    writeblock(out, "insAD", ntcmdad, ntcmdsize);
-    writeblock(out, "insSR", ntcmdsr, ntcmdsize);
-    writeblock(out, "insWavePos", ntcmdwavepos, ntcmdsize);
-    writeblock(out, "insPulsePos", ntcmdpulsepos, ntcmdsize);
-    writeblock(out, "insFiltPos", ntcmdfiltpos, ntcmdsize);
-    writeblock(out, "waveTbl", ntwavetbl, ntwavesize);
-    writeblock(out, "noteTbl", ntnotetbl, ntwavesize);
-    writeblock(out, "waveNextTbl", ntnexttbl, ntwavesize);
-    writeblock(out, "pulseLimitTbl", ntpulselimittbl, ntpulsesize);
-    writeblock(out, "pulseSpdTbl", ntpulsespdtbl, ntpulsesize);
-    writeblock(out, "pulseNextTbl", ntpulsenexttbl, ntpulsesize);
-    writeblock(out, "filtLimitTbl", ntfiltlimittbl, ntfiltsize);
-    writeblock(out, "filtSpdTbl", ntfiltspdtbl, ntfiltsize);
-    writeblock(out, "filtNextTbl", ntfiltnexttbl, ntfiltsize);
+    writeblock(out, "insAD", mpinsad, mpinssize);
+    writeblock(out, "insSR", mpinssr, mpinssize);
+    writeblock(out, "insWavePos", mpinswavepos, mpinssize);
+    writeblock(out, "insPulsePos", mpinspulsepos, mpinssize);
+    writeblock(out, "insFiltPos", mpinsfiltpos, mpinssize);
+    writeblock(out, "waveTbl", mpwavetbl, mpwavesize);
+    writeblock(out, "noteTbl", mpnotetbl, mpwavesize);
+    writeblock(out, "waveNextTbl", mpwavenexttbl, mpwavesize);
+    writeblock(out, "pulseLimitTbl", mppulselimittbl, mppulsesize);
+    writeblock(out, "pulseSpdTbl", mppulsespdtbl, mppulsesize);
+    writeblock(out, "pulseNextTbl", mppulsenexttbl, mppulsesize);
+    writeblock(out, "filtLimitTbl", mpfiltlimittbl, mpfiltsize);
+    writeblock(out, "filtSpdTbl", mpfiltspdtbl, mpfiltsize);
+    writeblock(out, "filtNextTbl", mpfiltnexttbl, mpfiltsize);
 
     for (c = 0; c <= highestusedsong; ++c)
     {
         char namebuf[80];
         sprintf(namebuf, "song%d", c);
-        writeblock(out, namebuf, &nttracks[c][0], ntsongtotallen[c]);
+        writeblock(out, namebuf, &mptracks[c][0], mpsongtotallen[c]);
     }
 
     for (c = 0; c <= highestusedpatt; ++c)
     {
         char namebuf[80];
         sprintf(namebuf, "patt%d", c);
-        writeblock(out, namebuf, &ntpatterns[c][0], ntpattlen[c]);
+        writeblock(out, namebuf, &mppatterns[c][0], mppattlen[c]);
     }
 }
 
