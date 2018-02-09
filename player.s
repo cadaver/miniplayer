@@ -155,6 +155,10 @@ REST            = $7f
         ;
         ; Use 0 in pulse & filterpointers to skip initialization.
 
+FIRSTINSTR      = $01
+FIRSTLEGATOINSTR = $81
+SKIPTABLEINIT   = $00
+
         ; Tables are based on having 3 colums, like NinjaTracker 1.
         ; The right side column is the "next" position, 0 to stop wave/pulse/filter
         ;
@@ -164,7 +168,13 @@ REST            = $7f
         ; $90       Slide, mid+right columns are 16bit speed-1, optimization due to carry being set
         ;           in slide routine
         ; $91-$ff   Delayed wavetable step without wavechange, delay is negative ($ff = one frame)
-        ;
+
+VIBRATO         = $00
+FIRSTWAVE       = $01
+LASTWAVE        = $8f
+SLIDE           = $90
+WAVEDELAY       = $100
+
         ; If pulse or filterpointer has the high bit ($80) set, the next step will be interpreted
         ; as an init-step:
         ;
@@ -176,8 +186,15 @@ REST            = $7f
         ;
         ; Otherwise pulse & filter steps include the cutoff/pulse target in the left column
         ; (for pulse, nybbles reversed) and speed (nybble reversed also) in the mid column.
-        ; Negative pulse speed values must have one subtracted from them, ie. if you have speed 
+        ; Negative pulse speed values must have one subtracted from them, ie. if you have speed
         ; $40 up, use $bf for down with same speed.
+
+TABLEINITSTEP   = $80
+FILTERCHN1      = $01
+FILTERCHN2      = $02
+FILTERCHN4      = $04
+LOWPASS         = $10
+BANDPASS        = $20
 
                 if PLAYER_MODULES > 0
 
@@ -188,7 +205,7 @@ REST            = $7f
         ;
         ; Playroutine should not be executed while this routine is executing, as they share the
         ; same zeropage locations.
-        
+
 SetMusicData:   sta SetMusicData_HeaderLda+1
                 clc
                 adc #MUSICHEADERSIZE
@@ -262,6 +279,14 @@ SetMusicData_AddDone:
         ;               $08 Set frequency, followed by freq highbyte (also set to lowbyte)
         ;               $10 Set freqmod, followed by 8-bit freqmod speed, which affects only highbyte
         ; $80-$ff   Delay, is negative similar to wavetable ($ff = one frame)
+
+SFXEND          = $00
+SFXINIT         = $01
+SFXPULSE        = $02
+SFXWAVE         = $04
+SFXFREQ         = $08
+SFXFREQMOD      = $10
+SFXDELAY        = $100
 
 PlaySfx:        sta chnSfxPtrLo,x
                 tya
