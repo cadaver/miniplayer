@@ -4,27 +4,29 @@
         ; Configuration:
         ;
         ; PLAYER_ZPBASE is the zeropage base address. 4 consecutive locations are needed,
-        ; or 5 with sound effect support
+        ; or 5 with sound effect support.
         ;
         ; PLAYER_SFX is whether to compile in the sound FX player. Three possible values:
-        ;       0 No sound FX support.
+        ;       0 No sound FX support
         ;       1 Overrides the music channel on which sounds are played, music can not
-        ;         continue underneath.
+        ;         continue underneath
         ;       2 Music is able to continue underneath and resume when the sound stops.
         ;         This has the effect of requiring extra channel variables and potentially
-        ;         more rastertime.
+        ;         more rastertime
         ;
         ; PLAYER_MODULES is whether the player can be pointed to new music modules during
         ; runtime (e.g. loadable music.) In this mode, the SetMusicData routine should be
         ; called before playback to set the music module address. Note that the music data
         ; itself needs to be assembled to a fixed known address, so that trackdata & pattern
-        ; addresses are correct within their respective tables.
+        ; addresses are correct within their respective tables, and it needs to include the
+        ; header information.
+        ;       0 No module support
+        ;       1 Include module support
 
 trackPtrLo      = PLAYER_ZPBASE+0
 trackPtrHi      = PLAYER_ZPBASE+1
 pattPtrLo       = PLAYER_ZPBASE+2
 pattPtrHi       = PLAYER_ZPBASE+3
-
                 if PLAYER_SFX > 0
 sfxTemp         = PLAYER_ZPBASE+4
                 endif
