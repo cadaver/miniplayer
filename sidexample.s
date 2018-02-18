@@ -1,7 +1,6 @@
 ; .sid example of using the playroutine. Assembles the music data directly after
 ; the player. SetMusicData not used.
 
-
                 processor 6502
                 org $0000
 
@@ -44,11 +43,11 @@ PLAYER_MODULES  = 0
 
         ; Player + musicdata
 
-                include player.s
+                include "player.s"
 
 Init:           clc
                 adc #$01
                 sta PlayRoutine+1
                 rts
 
-                include musicdata.s
+                include "musicdata.s"

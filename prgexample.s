@@ -105,12 +105,12 @@ PLAYER_MODULES  = 1
 
         ; Player
 
-                include player.s
+                include "player.s"
 
         ; Music module (assembled separately)
         
                 org $1000
-                incbin musicmodule.bin
+                incbin "musicmodule.bin"
 
         ; SFX data
 
