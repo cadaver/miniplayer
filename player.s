@@ -54,7 +54,7 @@ FIXUP_ZERO      = 0
 FIXUP_MINUS1    = 1
 FIXUP_MINUS81   = 2
 
-NUMFIXUPS       = 29
+NUMFIXUPS       = 30
 
         ; Track-data format:
         ; [transpose], pattern, [end]
@@ -150,7 +150,7 @@ WAVEPTR         = $7c
 KEYOFF          = $7e
 REST            = $7f
 
-        ; Instruments are roughly as in NinjaTracker 2, having ADSR and wave/pulse/filterpointers
+        ; Instruments have ADSR, 1st frame waveform and wave/pulse/filterpointers
         ;
         ; Instruments $01-$7f use gateoff before note and ADSR init.
         ; Instruments $81-$ff are the same instruments in legato mode: no gateoff, no ADSR change
@@ -605,7 +605,8 @@ Play_InsADM1Access:
 Play_InsSRM1Access:                             ;instrument. Strictly speaking they wouldn't need to be
                 lda insSR-1,y
                 sta $d406,x
-                lda #$09                        ;Fixed 1stframe wave
+Play_InsFirstWaveM1Access:
+                lda insFirstWave-1,y
                 sta $d404,x
 Play_FinishLegatoInit:
 Play_InsPulsePosM1Access:
@@ -803,6 +804,7 @@ fixupDestLoTbl: dc.b <Play_FiltNextTblM81Access
                 dc.b <Play_InsFiltPosM1Access
                 dc.b <Play_InsPulsePosM1Access
                 dc.b <Play_InsWavePosM1Access
+                dc.b <Play_InsFirstWaveM1Access
                 dc.b <Play_InsSRM1Access
                 dc.b <Play_InsADM1Access
                 dc.b <Play_PattTblHiM1Access
@@ -833,6 +835,7 @@ fixupDestHiTbl: dc.b >Play_FiltNextTblM81Access
                 dc.b >Play_InsFiltPosM1Access
                 dc.b >Play_InsPulsePosM1Access
                 dc.b >Play_InsWavePosM1Access
+                dc.b >Play_InsFirstWaveM1Access
                 dc.b >Play_InsSRM1Access
                 dc.b >Play_InsADM1Access
                 dc.b >Play_PattTblHiM1Access
@@ -864,6 +867,7 @@ fixupTypeTbl:   dc.b FIXUP_NOSIZE+FIXUP_MINUS81
                 dc.b FIXUP_INSSIZE+FIXUP_MINUS1
                 dc.b FIXUP_INSSIZE+FIXUP_MINUS1
                 dc.b FIXUP_INSSIZE+FIXUP_MINUS1
+                dc.b FIXUP_INSSIZE+FIXUP_MINUS1
                 dc.b FIXUP_PATTSIZE+FIXUP_MINUS1
                 dc.b FIXUP_PATTSIZE+FIXUP_MINUS1
                 dc.b FIXUP_SONGSIZE+FIXUP_MINUS1
@@ -882,6 +886,7 @@ pattTblLo:
 pattTblHi:
 insAD:
 insSR:
+insFirstWave:
 insWavePos:
 insPulsePos:
 insFiltPos:

@@ -81,6 +81,7 @@ unsigned char mpsongtotallen[MAX_MPSONGS];
 
 unsigned char mpinsad[MAX_MPCMD];
 unsigned char mpinssr[MAX_MPCMD];
+unsigned char mpinsfirstwave[MAX_MPCMD];
 unsigned char mpinswavepos[MAX_MPCMD];
 unsigned char mpinspulsepos[MAX_MPCMD];
 unsigned char mpinsfiltpos[MAX_MPCMD];
@@ -553,6 +554,7 @@ void clearmpsong(void)
     memset(mptracks, 0, sizeof mptracks);
     memset(mpinsad, 0, sizeof mpinsad);
     memset(mpinssr, 0, sizeof mpinssr);
+    memset(mpinsfirstwave, 0, sizeof mpinsfirstwave);
     memset(mpinswavepos, 0, sizeof mpinswavepos);
     memset(mpinspulsepos, 0, sizeof mpinspulsepos);
     memset(mpinsfiltpos, 0, sizeof mpinsfiltpos);
@@ -881,6 +883,7 @@ void convertsong(void)
             continue;
         mpinsad[mpinssize] = instr[e].ad;
         mpinssr[mpinssize] = instr[e].sr;
+        mpinsfirstwave[mpinssize] = instr[e].firstwave;
         mpinswavepos[mpinssize] = instrfirstwavepos[e] = waveposmap[instr[e].ptr[WTBL]];
 
         // Find out last wavestep for legato, also find out if pulse is used
@@ -1316,6 +1319,7 @@ unsigned char getlegatoinstr(unsigned char instr)
     
     mpinsad[mpinssize] = 0;
     mpinssr[mpinssize] = 0;
+    mpinsfirstwave[mpinssize] = 0;
     mpinswavepos[mpinssize] = instrlastwavepos[instr];
     mpinspulsepos[mpinssize] = 0;
     mpinsfiltpos[mpinssize] = 0;
@@ -1618,6 +1622,7 @@ void savempsong(const char* songfilename)
 
     writeblock(out, "insAD", mpinsad, mpinssize);
     writeblock(out, "insSR", mpinssr, mpinssize);
+    writeblock(out, "insFirstWave", mpinsfirstwave, mpinssize);
     writeblock(out, "insWavePos", mpinswavepos, mpinssize);
     writeblock(out, "insPulsePos", mpinspulsepos, mpinssize);
     writeblock(out, "insFiltPos", mpinsfiltpos, mpinssize);
