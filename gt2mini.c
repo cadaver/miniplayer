@@ -1563,7 +1563,7 @@ void savempsong(const char* songfilename)
         totalsize += 6;
     totalsize += (highestusedsong+1) * 5;
     totalsize += (highestusedpatt+1) * 2;
-    totalsize += mpinssize * 5;
+    totalsize += mpinssize * 6;
     totalsize += mpwavesize * 3;
     totalsize += mppulsesize * 3;
     totalsize += mpfiltsize * 3;
