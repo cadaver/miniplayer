@@ -26,8 +26,7 @@ start:          sei
                 lda #27
                 sta $d011
                 lda $dc0d
-                lda $d019
-                sta $d019
+                dec $d019
                 lda #<$1000
                 ldx #>$1000
                 jsr SetMusicData
