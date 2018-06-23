@@ -142,7 +142,7 @@ filtLimitTbl:
   dc.b $40,$bf,$40,$f8
 
 filtSpdTbl:
-  dc.b $d1,$01,$ff,$d1
+  dc.b $91,$01,$ff,$91
 
 filtNextTbl:
   dc.b $02,$03,$02,$00

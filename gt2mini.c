@@ -826,9 +826,7 @@ void convertsong(void)
             }
             else if (time & 0x80)
             {
-                if (time & 0x40)
-                    printf("Warning: highpass filter not supported\n");
-                mpfiltspdtbl[mpfiltsize] = (time & 0x30) | (spd & 0xcf);
+                mpfiltspdtbl[mpfiltsize] = (time & 0x70) | (spd & 0x8f);
                 mpfiltnexttbl[mpfiltsize] = mpfiltsize+1+1;
                 if (ltable[FTBL][sp] != 0)
                     printf("Warning: filter init-step not followed by set cutoff-step\n");

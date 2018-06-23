@@ -314,8 +314,8 @@ Play_FiltInit:
 Play_FiltSpdTblM81Access:
                 lda filtSpdTbl-$81,y
                 sta $d417
-                and #$30                        ;Lowpass or bandpass allowed, rest of bits used for
-                sta Play_FiltType+1             ;resonance control
+                and #$70                        ;Filter type
+                sta Play_FiltType+1
 Play_FiltNextTblM81Access:
                 lda filtNextTbl-$81,y
                 sta Play_FiltPos+1
