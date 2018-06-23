@@ -967,9 +967,10 @@ void convertsong(void)
 
     for (e = 0; e <= highestusedpatt; e++)
     {
-        unsigned char notecolumn[MAX_PATTROWS+1];
-        unsigned char cmdcolumn[MAX_PATTROWS+1];
-        unsigned char durcolumn[MAX_PATTROWS+1];
+        // Reserve more space due to possible step splitting
+        unsigned char notecolumn[MAX_PATTROWS*2];
+        unsigned char cmdcolumn[MAX_PATTROWS*2];
+        unsigned char durcolumn[MAX_PATTROWS*2];
         memset(cmdcolumn, 0, sizeof cmdcolumn);
         memset(durcolumn, 0, sizeof durcolumn);
         int pattlen = 0;
