@@ -1157,8 +1157,19 @@ void convertsong(void)
             ++d;
             lastwaveptr = waveptr;
         }
+        
+        /*
+        printf("Initial pattern %d:\n", e);
+        for (c = 0; c < MAX_PATTROWS*2; ++c)
+        {
+            printf("%02x: %02x %02x %02x\n", c, notecolumn[c],cmdcolumn[c],durcolumn[c]);
+            if (notecolumn[c] == MP_ENDPATT)
+                break;
+        }
+        printf("\n");
+        */
 
-        for (c = 0; c < MAX_PATTROWS+1;)
+        for (c = 0; c < MAX_PATTROWS*2;)
         {
             int merge = 0;
             
@@ -1183,7 +1194,7 @@ void convertsong(void)
             {
                 int d;
                 durcolumn[c] += durcolumn[c+1];
-                for (d = c+1; d < MAX_PATTROWS; d++)
+                for (d = c+1; d < MAX_PATTROWS*2-1; d++)
                 {
                     notecolumn[d] = notecolumn[d+1];
                     cmdcolumn[d] = cmdcolumn[d+1];
@@ -1195,7 +1206,7 @@ void convertsong(void)
         }
 
         // Check if two consecutive durations can be averaged
-        for (c = 0; c < MAX_PATTROWS+1; c++)
+        for (c = 0; c < MAX_PATTROWS*2; c++)
         {
             int sum = durcolumn[c] + durcolumn[c+1];
             int average = 0;
@@ -1224,7 +1235,7 @@ void convertsong(void)
         }
         
         // Remove 1-2-1 duration changes if possible
-        for (c = 1; c < MAX_PATTROWS+1; c++)
+        for (c = 1; c < MAX_PATTROWS*2; c++)
         {
             if (notecolumn[c] == MP_ENDPATT || notecolumn[c+1] == MP_ENDPATT)
                 break;
@@ -1245,7 +1256,7 @@ void convertsong(void)
         }
 
         // Fix if has too short durations
-        for (c = 0; c < MAX_PATTROWS; c++)
+        for (c = 0; c < MAX_PATTROWS*2; c++)
         {
             if (notecolumn[c] == MP_ENDPATT)
                 break;
@@ -1258,9 +1269,9 @@ void convertsong(void)
                 printf("Warning: adjusting too short duration in pattern %d step %d to %d (next step adjusted to %d)\n", e, c, durcolumn[c], durcolumn[c+1]);
             }
         }
-        
+
         // Clear unneeded durations
-        for (c = 0; c < MAX_PATTROWS+1; c++)
+        for (c = 0; c < MAX_PATTROWS*2; c++)
         {
             if (notecolumn[c] == MP_ENDPATT)
                 break;
@@ -1270,8 +1281,19 @@ void convertsong(void)
                 lastdur = durcolumn[c];
         }
 
+        /*
+        printf("Final pattern %d:\n", e);
+        for (c = 0; c < MAX_PATTROWS*2; ++c)
+        {
+            printf("%02x: %02x %02x %02x\n", c, notecolumn[c],cmdcolumn[c],durcolumn[c]);
+            if (notecolumn[c] == MP_ENDPATT)
+                break;
+        }
+        printf("\n");
+        */
+        
         // Build the final patterndata
-        for (c = 0; c < MAX_PATTROWS+1; c++)
+        for (c = 0; c < MAX_PATTROWS*2; c++)
         {
             if (notecolumn[c] == MP_ENDPATT)
             {
