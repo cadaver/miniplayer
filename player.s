@@ -747,7 +747,12 @@ Play_SongTblAccess2:
                 lda songTbl,y
                 sta trackPtrHi
                 iny
-                ldx #$00
+                ldx #21
+                lda #$00
+Play_ClearVars: sta chnWave-1,x
+                sta $d400-1,x
+                dex
+                bne Play_ClearVars
                 stx Play_FiltPos+1
                 stx Play_FiltType+1
                 stx $d417
@@ -760,16 +765,8 @@ Play_ChnInit:
 Play_SongTblAccess3:
                 lda songTbl,y
                 sta chnSongPos,x
+                dec chnDuration,x
                 iny
-                lda #$ff
-                sta chnDuration,x
-                lda #$00
-                sta chnCounter,x
-                sta chnNote,x
-                sta chnPattPos,x
-                sta chnWavePos,x
-                sta chnPulsePos,x
-                sta $d404,x
                 rts
 
 freqTbl:        dc.w $022d,$024e,$0271,$0296,$02be,$02e8,$0314,$0343,$0374,$03a9,$03e1,$041c
@@ -904,27 +901,27 @@ filtNextTbl:
 
         ; Playroutine variables
 
-chnTrans:       dc.b $80
-chnSongPos:     dc.b 0
+chnWave:        dc.b 0
+chnWavePos:     dc.b 0
+chnPulsePos:    dc.b 0
 chnPattPos:     dc.b 0
 chnDuration:    dc.b 0
 chnCounter:     dc.b 0
 chnNote:        dc.b 0
+
+                dc.b 0,0,0,0,0,0,0
+                dc.b 0,0,0,0,0,0,0
+
+chnTrans:       dc.b $80
+chnSongPos:     dc.b 0
 chnIns:         dc.b 0
-
-                dc.b $80,0,0,0,0,0,0
-                dc.b $80,0,0,0,0,0,0
-
-chnWave:        dc.b 0
-chnWavePos:     dc.b 0
 chnWaveTime:    dc.b 0
 chnPulse:       dc.b 0
-chnPulsePos:    dc.b 0
 chnFreqLo:      dc.b 0
 chnFreqHi:      dc.b 0
 
-                dc.b 0,0,0,0,0,0,0
-                dc.b 0,0,0,0,0,0,0
+                dc.b $80,0,0,0,0,0,0
+                dc.b $80,0,0,0,0,0,0
 
                 if PLAYER_SFX = 2
 chnSfxPos:      dc.b 0
