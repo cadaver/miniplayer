@@ -1006,7 +1006,7 @@ void convertsong(void)
             {
                 if (gtcmd != 0x3 || gtcmddata == 0)
                 {
-                    freq = freqtbl[note+pattbasetrans[e]-FIRSTNOTE-12];
+                    freq = freqtbl[note-FIRSTNOTE-12];
                 }
             }
 
@@ -1021,10 +1021,12 @@ void convertsong(void)
                     if (gtcmddata == 0 && note >= FIRSTNOTE+12 && note <= LASTNOTE) // Legato note start
                     {
                         mpinstr = getlegatoinstr(instr);
+                        tptargetnote = 0;
+                        tpstepsleft = 0;
                     }
                     else if (gtcmddata > 0 && note >= FIRSTNOTE+12 && note <= LASTNOTE)
                     {
-                        targetfreq = freqtbl[note+pattbasetrans[e]-FIRSTNOTE-12];
+                        targetfreq = freqtbl[note-FIRSTNOTE-12];
                         unsigned short speed = 0;
                         if (gtcmddata != 0)
                             speed = (ltable[STBL][gtcmddata-1] << 8) | rtable[STBL][gtcmddata-1];
