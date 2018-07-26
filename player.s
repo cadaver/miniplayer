@@ -640,7 +640,7 @@ Play_SfxDelayDone:
 Play_SfxDelayOngoing:
                 inc chnSfxTime,x
 Play_SfxEffects:lda chnSfxFreqMod,x
-                asl
+                clc
                 bne Play_SfxFreqMod
                 rts
 Play_SfxEnd:    sta chnSfxPtrHi,x
