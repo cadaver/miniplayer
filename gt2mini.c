@@ -74,6 +74,8 @@ unsigned char mpfiltnexttbl[MAX_MPTBLLEN+1];
 
 unsigned char mppatterns[MAX_MPPATT][MAX_MPPATTLEN];
 unsigned char mppattlen[MAX_MPPATT];
+unsigned char mppattnext[MAX_MPPATT];
+unsigned char mppattprev[MAX_MPPATT];
 
 unsigned char mptracks[MAX_MPSONGS][MAX_MPSONGLEN];
 unsigned char mpsongstart[MAX_MPSONGS][3];
@@ -567,6 +569,7 @@ void clearmpsong(void)
 void convertsong(void)
 {
     int e,c,f;
+    int mergepatt;
 
     memset(instrmap, 0, sizeof instrmap);
     memset(instrpulseused, 0, sizeof instrpulseused);
@@ -1333,6 +1336,119 @@ void convertsong(void)
         }
         mppattlen[e] = pattlen;
     }
+
+    // Check if some pattern is always followed by another, and combine
+    do
+    {
+        memset(mppattnext, 0, sizeof mppattnext);
+        memset(mppattprev, 0, sizeof mppattprev);
+        mergepatt = 0;
+        for (e = 0; e <= highestusedsong; e++)
+        {
+            int f;
+            for (f = 0; f < mpsongtotallen[e]-1; ++f)
+            {
+                int patt = mptracks[e][f];
+                if (patt >= 1 && patt < 128)
+                {
+                    int nextpatt = mptracks[e][f+1];
+                    if (nextpatt >= 1 && nextpatt < 128)
+                    {
+                        if (mppattnext[patt] == 0)
+                            mppattnext[patt] = nextpatt;
+                        else if (mppattnext[patt] != nextpatt)
+                            mppattnext[patt] = 0xff;
+                    }
+                    else
+                        mppattnext[patt] = 0xff;
+                }
+                if (f > 0)
+                {
+                    int prevpatt = mptracks[e][f-1];
+                    if (prevpatt >= 1 && prevpatt < 128)
+                    {
+                        if (mppattprev[patt] == 0)
+                            mppattprev[patt] = prevpatt;
+                        else if (mppattprev[patt] != prevpatt)
+                            mppattprev[patt] = 0xff;
+                    }
+                    else
+                        mppattprev[patt] = 0xff;
+                }
+            }
+        }
+        for (e = 1; e <= highestusedpatt+1; ++e)
+        {
+            if (mppattnext[e] > 0 && mppattnext[e] < 128 && mppattprev[mppattnext[e]] == e && mppattlen[e-1] + mppattlen[mppattnext[e]-1] <= 256)
+            {
+                int mergedest = e-1;
+                int mergesrc = mppattnext[e]-1;
+                int f,g;
+
+                printf("Joining pattern %d into %d\n", mergesrc, mergedest);
+                mergepatt = 1;
+
+                memcpy(&mppatterns[mergedest][mppattlen[mergedest]-1], &mppatterns[mergesrc][0], mppattlen[mergesrc]);
+                mppattlen[mergedest] = mppattlen[mergedest] + mppattlen[mergesrc] - 1;
+                for (f = mergesrc; f < highestusedpatt; ++f)
+                {
+                    memcpy(&mppatterns[f][0], &mppatterns[f+1][0], MAX_MPPATTLEN);
+                    mppattlen[f] = mppattlen[f+1];
+                }
+                --highestusedpatt;
+
+                for (f = 0; f <= highestusedsong; ++f)
+                {
+                    /*
+                    printf("Song %d before merge:\n", f);
+                    for (g = 0; g < mpsongtotallen[f]; ++g)
+                        printf("%02x ", mptracks[f][g]);
+                    printf("\n\n");
+                    */
+
+                    for (g = 0; g < mpsongtotallen[f];)
+                    {
+                        if (mptracks[f][g] == mergesrc+1)
+                        {
+                            int h;
+                            memmove(&mptracks[f][g], &mptracks[f][g+1], mpsongtotallen[f]-g-1);
+                            --mpsongtotallen[f];
+                            if (g < mpsongstart[f][1])
+                                --mpsongstart[f][1];
+                            if (g < mpsongstart[f][2])
+                                --mpsongstart[f][2];
+                            // Adjust jump points
+                            for (h = 0; h < mpsongtotallen[f]-1; ++h)
+                            {
+                                if (mptracks[f][h] == 0 && mptracks[f][h+1] > g)
+                                    --mptracks[f][h+1];
+                            }
+                        }
+                        else if (mptracks[f][g] == 0)
+                        {
+                            // Jump over the jump point
+                            g += 2;
+                        }
+                        else
+                        {
+                            if (mptracks[f][g] > mergesrc+1 && mptracks[f][g] < 128)
+                                --mptracks[f][g];
+                            ++g;
+                        }
+                    }
+                    
+                    /*
+                    printf("Song %d after merge:\n", f);
+                    for (g = 0; g < mpsongtotallen[f]; ++g)
+                        printf("%02x ", mptracks[f][g]);
+                    printf("\n\n");
+                    */
+                }
+                break;
+            }
+        }
+    }
+    while (mergepatt);
 }
 
 unsigned char getlegatoinstr(unsigned char instr)
