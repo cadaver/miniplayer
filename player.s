@@ -342,7 +342,6 @@ Play_Commands:  cmp #KEYOFF
                 else
                 beq Play_Keyoff
                 endif
-                beq Play_Keyoff
                 bcs Play_Rest
 Play_WavePtr:   iny
                 lda (pattPtrLo),y
