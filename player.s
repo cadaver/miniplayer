@@ -36,19 +36,21 @@ sfxTemp         = PLAYER_ZPBASE+4
         ; - Song table size
         ; - Number of patterns
         ; - Number of instruments
+        ; - Number of instruments including legato
         ; - Number of wave table steps
         ; - Number of pulse table steps
         ; - Number of filter table steps
 
-MUSICHEADERSIZE = 6
+MUSICHEADERSIZE = 7
 
 FIXUP_SONGSIZE  = 0
 FIXUP_PATTSIZE  = 4
 FIXUP_INSSIZE   = 8
-FIXUP_WAVESIZE  = 12
-FIXUP_PULSESIZE = 16
-FIXUP_FILTSIZE  = 20
-FIXUP_NOSIZE    = $80
+FIXUP_LEGATOINSSIZE = 12
+FIXUP_WAVESIZE  = 16
+FIXUP_PULSESIZE = 20
+FIXUP_FILTSIZE  = 24
+FIXUP_NOSIZE    = 28
 
 FIXUP_ZERO      = 0
 FIXUP_MINUS1    = 1
@@ -153,7 +155,7 @@ REST            = $7f
         ; Instruments have ADSR, 1st frame waveform and wave/pulse/filterpointers
         ;
         ; Instruments $01-$7f use gateoff before note and ADSR init.
-        ; Instruments $81-$ff are the same instruments in legato mode: no gateoff, no ADSR change
+        ; Instruments $81-$ff are the same instruments in legato mode: no gateoff, no ADSR/pulse/filter change
         ;
         ; Use 0 in pulse & filterpointers to skip initialization.
 
@@ -216,21 +218,26 @@ SetMusicData:   sta SetMusicData_HeaderLda+1
                 txa
                 adc #$00
                 sta trackPtrHi
-                ldx #NUMFIXUPS-1
+                ldx #$00
 SetMusicData_FixupLoop:
                 lda fixupDestLoTbl,x
                 sta pattPtrLo
                 lda fixupDestHiTbl,x
-                sta pattPtrHi
-                lda fixupTypeTbl,x
                 pha
-                bmi SetMusicData_AddDone
+                and #$03
+                adc #>PlayRoutine
+                sta pattPtrHi
+                pla
                 lsr
                 lsr
+                pha
+                lsr
+                lsr
+                cmp #FIXUP_NOSIZE/4
+                bcs SetMusicData_AddDone
                 tay
 SetMusicData_HeaderLda:
                 lda musicHeader,y
-                clc
                 adc trackPtrLo
                 sta trackPtrLo
                 bcc SetMusicData_AddDone
@@ -248,8 +255,9 @@ SetMusicData_AddDone:
                 lda trackPtrHi
                 sbc #$00
                 sta (pattPtrLo),y
-                dex
-                bpl SetMusicData_FixupLoop
+                inx
+                cpx #NUMFIXUPS
+                bcc SetMusicData_FixupLoop
                 rts
 
                 endif
@@ -607,7 +615,6 @@ Play_InsSRM1Access:                             ;instrument. Strictly speaking t
 Play_InsFirstWaveM1Access:
                 lda insFirstWave-1,y
                 sta $d404,x
-Play_FinishLegatoInit:
 Play_InsPulsePosM1Access:
                 lda insPulsePos-1,y
                 beq Play_SkipPulseInit
@@ -618,6 +625,7 @@ Play_InsFiltPosM1Access:
                 beq Play_SkipFiltInit
                 sta Play_FiltPos+1
 Play_SkipFiltInit:
+Play_FinishLegatoInit:
 Play_InsWavePosM1Access:
                 lda insWavePos-1,y
 Play_SetWavePos:sta chnWavePos,x
@@ -778,98 +786,67 @@ freqTbl:        dc.w $022d,$024e,$0271,$0296,$02be,$02e8,$0314,$0343,$0374,$03a9
 
                 if PLAYER_MODULES > 0
 
-fixupDestLoTbl: dc.b <Play_FiltNextTblM81Access
-                dc.b <Play_FiltNextTblM1Access
-                dc.b <Play_FiltSpdTblM81Access
-                dc.b <Play_FiltSpdTblM1Access
-                dc.b <Play_FiltLimitTblM81Access
-                dc.b <Play_FiltLimitTblM1Access
-                dc.b <Play_PulseNextTblM81Access
-                dc.b <Play_PulseNextTblM1Access
-                dc.b <Play_PulseSpdTblM1Access
-                dc.b <Play_PulseLimitTblM81Access
-                dc.b <Play_PulseLimitTblM1Access
-                dc.b <Play_WaveNextTblM1Access4
-                dc.b <Play_WaveNextTblM1Access3
-                dc.b <Play_WaveNextTblM1Access2
-                dc.b <Play_WaveNextTblM1Access1
-                dc.b <Play_NoteTblM1Access3
-                dc.b <Play_NoteTblM1Access2
-                dc.b <Play_NoteTblM1Access1
-                dc.b <Play_WaveTblM1Access
-                dc.b <Play_InsFiltPosM1Access
-                dc.b <Play_InsPulsePosM1Access
-                dc.b <Play_InsWavePosM1Access
-                dc.b <Play_InsFirstWaveM1Access
-                dc.b <Play_InsSRM1Access
-                dc.b <Play_InsADM1Access
-                dc.b <Play_PattTblHiM1Access
-                dc.b <Play_PattTblLoM1Access
-                dc.b <Play_SongTblAccess3
+fixupDestLoTbl: dc.b <Play_SongTblAccess1
                 dc.b <Play_SongTblAccess2
-                dc.b <Play_SongTblAccess1
+                dc.b <Play_SongTblAccess3
+                dc.b <Play_PattTblLoM1Access
+                dc.b <Play_PattTblHiM1Access
+                dc.b <Play_InsADM1Access
+                dc.b <Play_InsSRM1Access
+                dc.b <Play_InsFirstWaveM1Access
+                dc.b <Play_InsPulsePosM1Access
+                dc.b <Play_InsFiltPosM1Access
+                dc.b <Play_InsWavePosM1Access
+                dc.b <Play_WaveTblM1Access
+                dc.b <Play_NoteTblM1Access1
+                dc.b <Play_NoteTblM1Access2
+                dc.b <Play_NoteTblM1Access3
+                dc.b <Play_WaveNextTblM1Access1
+                dc.b <Play_WaveNextTblM1Access2
+                dc.b <Play_WaveNextTblM1Access3
+                dc.b <Play_WaveNextTblM1Access4
+                dc.b <Play_PulseLimitTblM1Access
+                dc.b <Play_PulseLimitTblM81Access
+                dc.b <Play_PulseSpdTblM1Access
+                dc.b <Play_PulseNextTblM1Access
+                dc.b <Play_PulseNextTblM81Access
+                dc.b <Play_FiltLimitTblM1Access
+                dc.b <Play_FiltLimitTblM81Access            
+                dc.b <Play_FiltSpdTblM1Access
+                dc.b <Play_FiltSpdTblM81Access
+                dc.b <Play_FiltNextTblM1Access
+                dc.b <Play_FiltNextTblM81Access
 
-fixupDestHiTbl: dc.b >Play_FiltNextTblM81Access
-                dc.b >Play_FiltNextTblM1Access
-                dc.b >Play_FiltSpdTblM81Access
-                dc.b >Play_FiltSpdTblM1Access
-                dc.b >Play_FiltLimitTblM81Access
-                dc.b >Play_FiltLimitTblM1Access
-                dc.b >Play_PulseNextTblM81Access
-                dc.b >Play_PulseNextTblM1Access
-                dc.b >Play_PulseSpdTblM1Access
-                dc.b >Play_PulseLimitTblM81Access
-                dc.b >Play_PulseLimitTblM1Access
-                dc.b >Play_WaveNextTblM1Access4
-                dc.b >Play_WaveNextTblM1Access3
-                dc.b >Play_WaveNextTblM1Access2
-                dc.b >Play_WaveNextTblM1Access1
-                dc.b >Play_NoteTblM1Access3
-                dc.b >Play_NoteTblM1Access2
-                dc.b >Play_NoteTblM1Access1
-                dc.b >Play_WaveTblM1Access
-                dc.b >Play_InsFiltPosM1Access
-                dc.b >Play_InsPulsePosM1Access
-                dc.b >Play_InsWavePosM1Access
-                dc.b >Play_InsFirstWaveM1Access
-                dc.b >Play_InsSRM1Access
-                dc.b >Play_InsADM1Access
-                dc.b >Play_PattTblHiM1Access
-                dc.b >Play_PattTblLoM1Access
-                dc.b >Play_SongTblAccess3
-                dc.b >Play_SongTblAccess2
-                dc.b >Play_SongTblAccess1
-
-fixupTypeTbl:   dc.b FIXUP_NOSIZE+FIXUP_MINUS81
-                dc.b FIXUP_FILTSIZE+FIXUP_MINUS1
-                dc.b FIXUP_NOSIZE+FIXUP_MINUS81
-                dc.b FIXUP_FILTSIZE+FIXUP_MINUS1
-                dc.b FIXUP_NOSIZE+FIXUP_MINUS81
-                dc.b FIXUP_PULSESIZE+FIXUP_MINUS1
-                dc.b FIXUP_NOSIZE+FIXUP_MINUS81
-                dc.b FIXUP_PULSESIZE+FIXUP_MINUS1
-                dc.b FIXUP_PULSESIZE+FIXUP_MINUS1
-                dc.b FIXUP_NOSIZE+FIXUP_MINUS81
-                dc.b FIXUP_WAVESIZE+FIXUP_MINUS1
-                dc.b FIXUP_NOSIZE+FIXUP_MINUS1
-                dc.b FIXUP_NOSIZE+FIXUP_MINUS1
-                dc.b FIXUP_NOSIZE+FIXUP_MINUS1
-                dc.b FIXUP_WAVESIZE+FIXUP_MINUS1
-                dc.b FIXUP_NOSIZE+FIXUP_MINUS1
-                dc.b FIXUP_NOSIZE+FIXUP_MINUS1
-                dc.b FIXUP_WAVESIZE+FIXUP_MINUS1
-                dc.b FIXUP_INSSIZE+FIXUP_MINUS1
-                dc.b FIXUP_INSSIZE+FIXUP_MINUS1
-                dc.b FIXUP_INSSIZE+FIXUP_MINUS1
-                dc.b FIXUP_INSSIZE+FIXUP_MINUS1
-                dc.b FIXUP_INSSIZE+FIXUP_MINUS1
-                dc.b FIXUP_INSSIZE+FIXUP_MINUS1
-                dc.b FIXUP_PATTSIZE+FIXUP_MINUS1
-                dc.b FIXUP_PATTSIZE+FIXUP_MINUS1
-                dc.b FIXUP_SONGSIZE+FIXUP_MINUS1
-                dc.b FIXUP_NOSIZE
-                dc.b FIXUP_NOSIZE
-                dc.b FIXUP_NOSIZE
+fixupDestHiTbl: dc.b >Play_SongTblAccess1 - >PlayRoutine           + (FIXUP_NOSIZE+FIXUP_ZERO)*4
+                dc.b >Play_SongTblAccess2 - >PlayRoutine           + (FIXUP_NOSIZE+FIXUP_ZERO)*4
+                dc.b >Play_SongTblAccess3 - >PlayRoutine           + (FIXUP_NOSIZE+FIXUP_ZERO)*4
+                dc.b >Play_PattTblLoM1Access - >PlayRoutine        + (FIXUP_SONGSIZE+FIXUP_MINUS1)*4
+                dc.b >Play_PattTblHiM1Access - >PlayRoutine        + (FIXUP_PATTSIZE+FIXUP_MINUS1)*4
+                dc.b >Play_InsADM1Access - >PlayRoutine            + (FIXUP_PATTSIZE+FIXUP_MINUS1)*4
+                dc.b >Play_InsSRM1Access - >PlayRoutine            + (FIXUP_INSSIZE+FIXUP_MINUS1)*4
+                dc.b >Play_InsFirstWaveM1Access - >PlayRoutine     + (FIXUP_INSSIZE+FIXUP_MINUS1)*4
+                dc.b >Play_InsPulsePosM1Access - >PlayRoutine      + (FIXUP_INSSIZE+FIXUP_MINUS1)*4
+                dc.b >Play_InsFiltPosM1Access - >PlayRoutine       + (FIXUP_INSSIZE+FIXUP_MINUS1)*4
+                dc.b >Play_InsWavePosM1Access - >PlayRoutine       + (FIXUP_INSSIZE+FIXUP_MINUS1)*4
+                dc.b >Play_WaveTblM1Access - >PlayRoutine          + (FIXUP_LEGATOINSSIZE+FIXUP_MINUS1)*4
+                dc.b >Play_NoteTblM1Access1 - >PlayRoutine         + (FIXUP_WAVESIZE+FIXUP_MINUS1)*4
+                dc.b >Play_NoteTblM1Access2 - >PlayRoutine         + (FIXUP_NOSIZE+FIXUP_MINUS1)*4
+                dc.b >Play_NoteTblM1Access3 - >PlayRoutine         + (FIXUP_NOSIZE+FIXUP_MINUS1)*4
+                dc.b >Play_WaveNextTblM1Access1 - >PlayRoutine     + (FIXUP_WAVESIZE+FIXUP_MINUS1)*4
+                dc.b >Play_WaveNextTblM1Access2 - >PlayRoutine     + (FIXUP_NOSIZE+FIXUP_MINUS1)*4
+                dc.b >Play_WaveNextTblM1Access3 - >PlayRoutine     + (FIXUP_NOSIZE+FIXUP_MINUS1)*4
+                dc.b >Play_WaveNextTblM1Access4 - >PlayRoutine     + (FIXUP_NOSIZE+FIXUP_MINUS1)*4
+                dc.b >Play_PulseLimitTblM1Access - >PlayRoutine    + (FIXUP_WAVESIZE+FIXUP_MINUS1)*4
+                dc.b >Play_PulseLimitTblM81Access - >PlayRoutine   + (FIXUP_NOSIZE+FIXUP_MINUS81)*4
+                dc.b >Play_PulseSpdTblM1Access - >PlayRoutine      + (FIXUP_PULSESIZE+FIXUP_MINUS1)*4
+                dc.b >Play_PulseNextTblM1Access - >PlayRoutine     + (FIXUP_PULSESIZE+FIXUP_MINUS1)*4
+                dc.b >Play_PulseNextTblM81Access - >PlayRoutine    + (FIXUP_NOSIZE+FIXUP_MINUS81)*4
+                dc.b >Play_FiltLimitTblM1Access - >PlayRoutine     + (FIXUP_PULSESIZE+FIXUP_MINUS1)*4
+                dc.b >Play_FiltLimitTblM81Access - >PlayRoutine    + (FIXUP_NOSIZE+FIXUP_MINUS81)*4
+                dc.b >Play_FiltSpdTblM1Access - >PlayRoutine       + (FIXUP_FILTSIZE+FIXUP_MINUS1)*4
+                dc.b >Play_FiltSpdTblM81Access - >PlayRoutine      + (FIXUP_NOSIZE+FIXUP_MINUS81)*4
+                dc.b >Play_FiltNextTblM1Access - >PlayRoutine      + (FIXUP_FILTSIZE+FIXUP_MINUS1)*4
+                dc.b >Play_FiltNextTblM81Access - >PlayRoutine     + (FIXUP_NOSIZE+FIXUP_MINUS81)*4
 
 fixupSubTbl:    dc.b $00,$01,$81
 
